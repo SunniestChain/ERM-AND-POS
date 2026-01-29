@@ -23,9 +23,10 @@ dist-ssr
 *.sln
 *.sw?
 
-# Server
-server/node_modules
-server/public
+# Server/API
+api/node_modules
+api/public
 server.zip
-**/.DS_Store
+# erm.db (Not ignored so it uploads to Vercel)
+
 
