@@ -1,12 +1,25 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const fs = require('fs');
 
-const dbPath = path.resolve(__dirname, 'erm.db');
+// Vercel Hack: Use /tmp for writable DB (Data will persist only for short time)
+const isVercel = process.env.VERCEL || process.env.NOW_REGION;
+let dbPath = path.resolve(__dirname, 'erm.db');
+
+if (isVercel) {
+  dbPath = '/tmp/erm.db';
+  // Copy template if exists, otherwise it will create empty
+  const sourceDb = path.resolve(__dirname, 'erm.db');
+  if (fs.existsSync(sourceDb) && !fs.existsSync(dbPath)) {
+    fs.copyFileSync(sourceDb, dbPath);
+  }
+}
+
 const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
     console.error('Error opening database ' + dbPath + ': ' + err.message);
   } else {
-    console.log('Connected to the SQLite database.');
+    console.log('Connected to the SQLite database at ' + dbPath);
   }
 });
 
