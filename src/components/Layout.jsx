@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { api } from '../api';
 import AdminStatsModal from './AdminStatsModal';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 export default function Layout({ children }) {
