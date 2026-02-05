@@ -23,25 +23,49 @@ app.get('/api/products', async (req, res) => {
     try {
         const { engineId, categoryId, search } = req.query;
 
+        // Base Query
         let query = supabase.from('products').select(`
             *,
-            engine:engines(id, name, manufacturer:manufacturers(id, name)),
+            product_engines!left (
+                engine:engines (id, name, manufacturer:manufacturers(id, name))
+            ),
             category:categories(id, name)
         `);
 
         if (search) {
             query = query.or(`part_number.ilike.%${search}%,name.ilike.%${search}%,description.ilike.%${search}%`);
         }
+
+        // Filter by Engine (Many-to-Many)
         if (engineId) {
-            query = query.eq('engine_id', engineId);
+            // Use !inner instead of !left to force filtering
+            query = supabase.from('products').select(`
+                *,
+                product_engines!inner (
+                    engine_id
+                ),
+                category:categories(id, name)
+            `).eq('product_engines.engine_id', engineId);
         }
+
         if (categoryId) {
             query = query.eq('category_id', categoryId);
         }
 
         const { data, error } = await query;
         if (error) throw error;
-        res.json(data);
+
+        // Transform data for frontend compatibility
+        const formatted = data.map(p => {
+            const engines = p.product_engines ? p.product_engines.map(pe => pe.engine) : [];
+            return {
+                ...p,
+                engines: engines,
+                engine: engines[0] || null
+            };
+        });
+
+        res.json(formatted);
     } catch (err) {
         handleError(res, err);
     }
@@ -229,12 +253,32 @@ app.get('/api/admin/stats', async (req, res) => {
 // Update Product
 app.put('/api/products/:id', async (req, res) => {
     try {
-        const { part_number, name, description, notes, image_url } = req.body;
+        const { part_number, name, description, notes, image_url, engineIds } = req.body;
+
+        // 1. Update Product Details
         const { error } = await supabase
             .from('products')
             .update({ part_number, name, description, notes, image_url })
             .eq('id', req.params.id);
         if (error) throw error;
+
+        // 2. Update Engine Links (if provided)
+        if (engineIds && Array.isArray(engineIds)) {
+            // Delete existing links
+            const { error: delErr } = await supabase.from('product_engines').delete().eq('product_id', req.params.id);
+            if (delErr) throw delErr;
+
+            // Insert new links
+            if (engineIds.length > 0) {
+                const links = engineIds.map(eid => ({
+                    product_id: req.params.id,
+                    engine_id: eid
+                }));
+                const { error: insErr } = await supabase.from('product_engines').insert(links);
+                if (insErr) throw insErr;
+            }
+        }
+
         res.json({ success: true });
     } catch (err) {
         handleError(res, err);
@@ -574,33 +618,54 @@ app.post('/api/inventory/import', bodyParser.text({ type: 'text/*' }), async (re
 
 // --- Auth & Login ---
 // Initialize Users Table (Simple migration for this task)
-const initUsers = async () => {
+// --- Auth & System Init ---
+const initSystem = async () => {
     try {
-        console.log("Checking if 'admin' user exists...");
-        const { data, error } = await supabase.from('app_users').select('id, username, password').eq('username', 'admin').maybeSingle();
+        console.log("Initializing System...");
 
-        if (error) {
-            console.error("Error checking users:", error.message);
-            return;
-        }
-
-        if (!data) {
-            console.log("Admin user not found. Initializing Users...");
-            const { error: insertError } = await supabase.from('app_users').insert([
+        // 1. Users
+        const { data: admin } = await supabase.from('app_users').select('id').eq('username', 'admin').maybeSingle();
+        if (!admin) {
+            console.log(" Creating default users...");
+            await supabase.from('app_users').insert([
                 { username: 'admin', password: 'admin', role: 'admin' },
                 { username: 'pos', password: 'pos', role: 'employee' }
             ]);
-            if (insertError) console.error("Error creating users:", insertError.message);
-            else console.log("Default users created.");
-        } else {
-            console.log("Admin user exists:", data);
         }
+
+        // 2. Migration: Products.engine_id -> product_engines
+        // Check if we have legacy data but no new data
+        const { count } = await supabase.from('product_engines').select('*', { count: 'exact', head: true });
+
+        if (count === 0) {
+            console.log("Checking for legacy engine data to migrate...");
+            // Fetch products that HAVE an engine_id
+            const { data: legacyProducts } = await supabase.from('products').select('id, engine_id').not('engine_id', 'is', null);
+
+            if (legacyProducts && legacyProducts.length > 0) {
+                console.log(`Migrating ${legacyProducts.length} products to product_engines...`);
+                // Prepare bulk insert
+                const links = legacyProducts.map(p => ({
+                    product_id: p.id,
+                    engine_id: p.engine_id
+                }));
+
+                const { error: migErr } = await supabase.from('product_engines').insert(links);
+                if (migErr) console.error("Migration failed:", migErr);
+                else console.log("Migration successful!");
+            } else {
+                console.log("No legacy data found.");
+            }
+        } else {
+            console.log("product_engines already populated.");
+        }
+
     } catch (e) {
-        console.error("Exception in initUsers:", e);
+        console.error("System Init Error:", e);
     }
 };
 // Call it
-initUsers();
+initSystem();
 
 app.post('/api/login', async (req, res) => {
     console.log("Login attempt for:", req.body.username);

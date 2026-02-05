@@ -13,9 +13,25 @@ export default function ProductEditor({ product, onClose }) {
     const [newPrice, setNewPrice] = useState('0');
     const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
+    // Multi-Engine State
+    const [hierarchy, setHierarchy] = useState({ manufacturers: [], engines: [] });
+    const [selectedEngineIds, setSelectedEngineIds] = useState([]);
+    const [showEngineSelector, setShowEngineSelector] = useState(false);
+
     useEffect(() => {
         api.getVariants(product.id).then(setVariants);
-        api.getHierarchy().then(data => setAllSuppliers(data.suppliers));
+        api.getHierarchy().then(data => {
+            setAllSuppliers(data.suppliers);
+            setHierarchy(data);
+        });
+
+        // Initialize selected engines from product
+        if (product.engines && product.engines.length > 0) {
+            setSelectedEngineIds(product.engines.map(e => e.id));
+        } else if (product.engine) {
+            // Legacy/Fallback
+            setSelectedEngineIds([product.engine.id]);
+        }
     }, [product]);
 
     const handleMasterChange = (e) => {
@@ -61,7 +77,7 @@ export default function ProductEditor({ product, onClose }) {
         setMessage('Saving...');
         try {
             // 1. Update Master Product
-            await api.updateProduct(product.id, formData);
+            await api.updateProduct(product.id, { ...formData, engineIds: selectedEngineIds });
 
             // 2. Update All Variants
             // In a real app, promise.all or batch API
@@ -165,6 +181,59 @@ export default function ProductEditor({ product, onClose }) {
                             rows={2}
                             style={{ width: '100%', padding: '0.75rem', background: 'rgba(255,255,255,0.05)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', resize: 'vertical' }}
                         />
+                    </div>
+
+                    {/* Compatible Engines Section */}
+                    <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                            <label style={{ display: 'block', color: 'var(--text-muted)' }}>Compatible Engines</label>
+                            <button
+                                onClick={() => setShowEngineSelector(!showEngineSelector)}
+                                style={{ background: 'transparent', border: '1px solid var(--accent)', color: 'var(--accent)', padding: '0.25rem 0.5rem', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
+                            >
+                                {showEngineSelector ? 'Done' : 'Edit Engines'}
+                            </button>
+                        </div>
+
+                        {!showEngineSelector ? (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                {selectedEngineIds.length === 0 && <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No engines selected</span>}
+                                {selectedEngineIds.map(id => {
+                                    const eng = hierarchy.engines.find(e => e.id === id);
+                                    if (!eng) return null;
+                                    const manuf = hierarchy.manufacturers.find(m => m.id === eng.manufacturer_id);
+                                    return (
+                                        <span key={id} style={{ background: 'rgba(255,255,255,0.1)', padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.85rem' }}>
+                                            {manuf?.name} <b>{eng.name}</b>
+                                        </span>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <div style={{ maxHeight: '200px', overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
+                                {hierarchy.manufacturers.map(m => (
+                                    <div key={m.id}>
+                                        <div style={{ fontWeight: 'bold', color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '0.25rem' }}>{m.name}</div>
+                                        {hierarchy.engines.filter(e => e.manufacturer_id === m.id).map(e => (
+                                            <label key={e.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.25rem 0', cursor: 'pointer' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedEngineIds.includes(e.id)}
+                                                    onChange={(evt) => {
+                                                        if (evt.target.checked) {
+                                                            setSelectedEngineIds(prev => [...prev, e.id]);
+                                                        } else {
+                                                            setSelectedEngineIds(prev => prev.filter(id => id !== e.id));
+                                                        }
+                                                    }}
+                                                />
+                                                <span style={{ fontSize: '0.9rem', color: selectedEngineIds.includes(e.id) ? '#fff' : 'var(--text-muted)' }}>{e.name}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
 

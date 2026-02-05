@@ -34,6 +34,15 @@ const ProductRow = ({ product, onEdit, onDelete }) => {
             <td style={{ padding: '1rem', fontFamily: 'var(--font-mono)' }}>{product.part_number}</td>
             <td style={{ padding: '1rem', fontWeight: 600 }}>
                 {product.name}
+                {product.engines && product.engines.length > 0 && (
+                    <div style={{ fontSize: '0.75rem', color: 'var(--accent)', marginTop: '0.25rem', opacity: 0.8 }}>
+                        {product.engines.map((e, i) => (
+                            <span key={e.id} style={{ marginRight: '0.5rem' }}>
+                                {e.manufacturer?.name} {e.name}{i < product.engines.length - 1 ? ',' : ''}
+                            </span>
+                        ))}
+                    </div>
+                )}
             </td>
             <td style={{ padding: '1rem', color: 'var(--text-muted)', maxWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {product.description}
