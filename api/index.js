@@ -571,6 +571,69 @@ app.post('/api/inventory/import', bodyParser.text({ type: 'text/*' }), async (re
     }
 });
 
+
+// --- Auth & Login ---
+// Initialize Users Table (Simple migration for this task)
+const initUsers = async () => {
+    try {
+        console.log("Checking if 'admin' user exists...");
+        const { data, error } = await supabase.from('app_users').select('id, username, password').eq('username', 'admin').maybeSingle();
+
+        if (error) {
+            console.error("Error checking users:", error.message);
+            return;
+        }
+
+        if (!data) {
+            console.log("Admin user not found. Initializing Users...");
+            const { error: insertError } = await supabase.from('app_users').insert([
+                { username: 'admin', password: 'admin', role: 'admin' },
+                { username: 'pos', password: 'pos', role: 'employee' }
+            ]);
+            if (insertError) console.error("Error creating users:", insertError.message);
+            else console.log("Default users created.");
+        } else {
+            console.log("Admin user exists:", data);
+        }
+    } catch (e) {
+        console.error("Exception in initUsers:", e);
+    }
+};
+// Call it
+initUsers();
+
+app.post('/api/login', async (req, res) => {
+    console.log("Login attempt for:", req.body.username);
+    try {
+        const { username, password } = req.body;
+
+        // Simple plaintext check for this specific request
+        const { data: user, error } = await supabase
+            .from('app_users')
+            .select('username, role, password')
+            .eq('username', username)
+            .single();
+
+        if (error) {
+            console.error("Login DB Error:", error.message);
+            return res.status(401).json({ error: "User not found" });
+        }
+
+        console.log("User found:", user);
+
+        // Explicit password check (since .eq('password', password) might be tricky with case or spaces if not careful)
+        // Although the previous query had .eq('password', password), let's do it in JS to be sure what's failing
+        if (user.password !== password) {
+            console.error("Password mismatch. Expected:", user.password, "Againts:", password);
+            return res.status(401).json({ error: "Invalid credentials" });
+        }
+
+        res.json({ success: true, user: { username: user.username, role: user.role } });
+    } catch (err) {
+        handleError(res, err);
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
     console.log(`Connected to Supabase`);

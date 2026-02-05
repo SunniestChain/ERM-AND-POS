@@ -2,10 +2,12 @@ import { Link, useLocation } from 'react-router-dom';
 import { api } from '../api';
 import AdminStatsModal from './AdminStatsModal';
 import { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 
 export default function Layout({ children }) {
     const location = useLocation();
     const [showStats, setShowStats] = useState(false);
+    const { user, logout } = useAuth();
 
     const getLinkStyle = (path) => ({
         color: location.pathname === path ? 'var(--accent-primary)' : 'var(--text-primary)',
@@ -33,20 +35,23 @@ export default function Layout({ children }) {
                 </div>
 
                 <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
-                    <Link to="/" style={getLinkStyle('/')}>Dashboard</Link>
-                    <Link to="/management" style={getLinkStyle('/management')}>Management</Link>
+                    {user?.role === 'admin' && (
+                        <>
+                            <Link to="/" style={getLinkStyle('/')}>Dashboard</Link>
+                            <Link to="/management" style={getLinkStyle('/management')}>Management</Link>
+                        </>
+                    )}
                     <Link to="/pos" style={getLinkStyle('/pos')}>POS</Link>
                 </div>
 
-                <div style={{ display: 'flex', gap: '1rem' }}>
-                    <button className="btn-primary" onClick={() => setShowStats(true)} style={{ background: 'var(--accent-primary)', border: 'none' }}>
-                        Admin
-                    </button>
-                    <button className="btn-primary" style={{ background: 'transparent', border: '1px solid var(--border-highlight)' }}>
-                        Settings
-                    </button>
-                    <button className="btn-primary">
-                        + New Product
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                    {user?.role === 'admin' && (
+                        <button className="btn-primary" onClick={() => setShowStats(true)} style={{ background: 'var(--accent-primary)', border: 'none' }}>
+                            Admin
+                        </button>
+                    )}
+                    <button onClick={logout} className="btn-primary" style={{ background: 'transparent', border: '1px solid var(--border-highlight)' }}>
+                        Logout
                     </button>
                 </div>
             </nav>
