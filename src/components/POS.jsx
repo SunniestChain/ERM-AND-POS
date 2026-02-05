@@ -3,6 +3,121 @@ import { api } from '../api';
 import HierarchySelector from './HierarchySelector';
 import SalesHistory from './SalesHistory';
 
+import ReceiptModal from './ReceiptModal';
+
+const POSProductCard = ({ product, onAddToCart, refreshTrigger }) => {
+    const [variants, setVariants] = useState([]);
+    const [loadingVariants, setLoadingVariants] = useState(true);
+
+    useEffect(() => {
+        let mounted = true;
+        api.getVariants(product.id)
+            .then(data => {
+                if (mounted) {
+                    setVariants(data);
+                    setLoadingVariants(false);
+                }
+            })
+            .catch(() => mounted && setLoadingVariants(false));
+        return () => mounted = false;
+    }, [product.id, refreshTrigger]);
+
+    return (
+        <div style={{
+            background: 'rgba(255,255,255,0.05)',
+            borderRadius: '8px',
+            padding: '1rem',
+            border: '1px solid var(--border-subtle)',
+            display: 'flex',
+            gap: '1rem',
+            alignItems: 'flex-start'
+        }}>
+            {/* Left: Image (Square) */}
+            <div style={{
+                width: '100px',
+                height: '100px',
+                flexShrink: 0,
+                borderRadius: '6px',
+                overflow: 'hidden',
+                background: '#222',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+            }}>
+                {product.image_url ? (
+                    <img
+                        src={product.image_url}
+                        loading="lazy"
+                        alt={product.name}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                ) : (
+                    <span style={{ color: '#555', fontSize: '0.8rem' }}>No Image</span>
+                )}
+            </div>
+
+            {/* Right: Info */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                {/* Part Number */}
+                <div style={{
+                    fontFamily: 'var(--font-mono)',
+                    color: 'var(--primary-color)',
+                    fontWeight: 700,
+                    fontSize: '1.1rem'
+                }}>
+                    {product.part_number}
+                </div>
+
+                {/* Description/Name */}
+                <div style={{
+                    fontWeight: 500,
+                    fontSize: '1rem',
+                    marginBottom: '0.5rem',
+                    lineHeight: '1.2'
+                }}>
+                    {product.name}
+                </div>
+
+                {/* Variants */}
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: 'auto' }}>
+                    {loadingVariants ? (
+                        <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>Loading options...</span>
+                    ) : variants.length > 0 ? (
+                        variants.map(v => (
+                            <button key={v.id}
+                                onClick={() => onAddToCart(product, v)}
+                                style={{
+                                    background: 'var(--primary-color)',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    padding: '0.4rem 0.8rem',
+                                    cursor: 'pointer',
+                                    color: '#fff',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'start',
+                                    minWidth: '60px',
+                                    transition: 'transform 0.1s'
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'}
+                                onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                            >
+                                <span style={{ fontSize: '0.75rem', opacity: 0.9 }}>{v.supplierName}</span>
+                                <span style={{ fontWeight: 700 }}>${v.price}</span>
+                                <span style={{ fontSize: '0.65rem', color: v.stock_quantity > 0 ? '#4ade80' : '#ef4444' }}>
+                                    {v.stock_quantity > 0 ? `${v.stock_quantity} in stock` : 'Out of Stock'}
+                                </span>
+                            </button>
+                        ))
+                    ) : (
+                        <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>No options available</span>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 export default function POS() {
     // Search State
     const [searchTerm, setSearchTerm] = useState('');
@@ -17,37 +132,77 @@ export default function POS() {
     const [message, setMessage] = useState('');
     const [loading, setLoading] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
+    const [currentSaleId, setCurrentSaleId] = useState(null);
+    const [refreshTrigger, setRefreshTrigger] = useState(0); // Forces re-fetch of stock
 
+    // ... (UseEffect and Loaders same as original) ...
     // Fetch products when filters OR search change
     useEffect(() => {
-        // Debounce search slightly or just fetch
         const timer = setTimeout(() => {
+            setLoading(true); // Show loading only for initial list fetch
             if (searchTerm) {
-                // Clear hierarchy if searching
                 if (engineId || categoryId) {
                     setEngineId('');
                     setCategoryId('');
                 }
                 api.getProducts(null, null, searchTerm).then(data => {
-                    Promise.all(data.map(p => api.getVariants(p.id).then(v => ({ ...p, variants: v }))))
-                        .then(setProducts);
+                    setProducts(data); // Render immediately without variants
+                    setVisibleCount(20); // Reset visible count
+                    setLoading(false);
                 });
             } else if (engineId && categoryId) {
                 api.getProducts(engineId, categoryId).then(data => {
-                    Promise.all(data.map(p => api.getVariants(p.id).then(v => ({ ...p, variants: v }))))
-                        .then(setProducts);
+                    setProducts(data);
+                    setVisibleCount(20);
+                    setLoading(false);
                 });
             } else {
-                setProducts([]);
+                // Default: Load all products
+                api.getProducts().then(data => {
+                    setProducts(data);
+                    setVisibleCount(20);
+                    setLoading(false);
+                });
             }
         }, 300);
         return () => clearTimeout(timer);
     }, [searchTerm, engineId, categoryId]);
 
+    // Lazy Loading State
+    const [visibleCount, setVisibleCount] = useState(20);
+
+    // Infinite Scroll Trigger
+    useEffect(() => {
+        const trigger = document.getElementById('scroll-trigger');
+        if (!trigger) return;
+
+        const observer = new IntersectionObserver(entries => {
+            if (entries[0].isIntersecting) {
+                setVisibleCount(prev => prev + 20);
+            }
+        }, { threshold: 0.1 });
+
+        observer.observe(trigger);
+        return () => observer.disconnect();
+    }, [products]);
+
     const addToCart = (product, variant) => {
+        // Enforce Stock Limit
+        // Improve robustness: treat undefined/null as 0
+        const stock = parseInt(variant.stock_quantity) || 0;
+
+        if (stock <= 0) {
+            alert('Out of Stock');
+            return;
+        }
+
         setCart(prev => {
             const existing = prev.find(item => item.variantId === variant.id);
             if (existing) {
+                if (existing.quantity >= stock) {
+                    alert(`Cannot add more. Only ${stock} in stock.`);
+                    return prev;
+                }
                 return prev.map(item => item.variantId === variant.id
                     ? { ...item, quantity: item.quantity + 1 }
                     : item
@@ -56,8 +211,9 @@ export default function POS() {
             return [...prev, {
                 variantId: variant.id,
                 product,
-                variant,
-                quantity: 1
+                variant: { ...variant, stock_quantity: stock }, // Ensure normalized stock
+                quantity: 1,
+                unitPrice: variant.price // Initialize with default price
             }];
         });
     };
@@ -69,15 +225,29 @@ export default function POS() {
     const updateQuantity = (variantId, delta) => {
         setCart(prev => prev.map(item => {
             if (item.variantId === variantId) {
-                const newQty = Math.max(1, item.quantity + delta);
-                // Optional: Check stock limit here?
-                return { ...item, quantity: newQty };
+                const stock = item.variant.stock_quantity;
+                const newQty = item.quantity + delta;
+
+                if (delta > 0 && newQty > stock) {
+                    alert(`Cannot add more. Only ${stock} in stock.`);
+                    return item;
+                }
+                return { ...item, quantity: Math.max(1, newQty) };
             }
             return item;
         }));
     };
 
-    const cartTotal = cart.reduce((sum, item) => sum + (item.variant.price * item.quantity), 0);
+    const updatePrice = (variantId, newPrice) => {
+        setCart(prev => prev.map(item => {
+            if (item.variantId === variantId) {
+                return { ...item, unitPrice: parseFloat(newPrice) || 0 };
+            }
+            return item;
+        }));
+    };
+
+    const cartTotal = cart.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
 
     const handleCheckout = async () => {
         if (cart.length === 0) return;
@@ -87,7 +257,7 @@ export default function POS() {
                 items: cart.map(item => ({
                     variantId: item.variantId,
                     quantity: item.quantity,
-                    unitPrice: item.variant.price,
+                    unitPrice: item.unitPrice,
                     productName: item.product.name,
                     supplierName: item.variant.supplierName
                 }))
@@ -95,15 +265,11 @@ export default function POS() {
 
             const result = await api.createSale(saleData);
             if (result.success) {
-                setMessage(`Sale #${result.saleId} completed successfully!`);
+                setMessage(`Sale #${result.saleId} completed!`);
                 setCart([]);
-                // Refresh products to show updated stock?
-                // Trigger re-fetch
-                if (engineId && categoryId) {
-                    const data = await api.getProducts(engineId, categoryId);
-                    const productsWithVariants = await Promise.all(data.map(p => api.getVariants(p.id).then(v => ({ ...p, variants: v }))));
-                    setProducts(productsWithVariants);
-                }
+                setCurrentSaleId(result.saleId); // Trigger Receipt
+                setRefreshTrigger(prev => prev + 1); // FORCE REFRESH OF STOCK
+
                 setTimeout(() => setMessage(''), 3000);
             }
         } catch (error) {
@@ -137,12 +303,10 @@ export default function POS() {
                         }}
                     />
 
-                    {/* Only show hierarchy if not searching (or let them coexist but search overrides) */}
+                    {/* Only show hierarchy if not searching */}
                     <div style={{ opacity: searchTerm ? 0.5 : 1, pointerEvents: searchTerm ? 'none' : 'auto' }}>
                         <HierarchySelector
                             onSelectionChange={({ manufacturerId, engineId, categoryId }) => {
-                                // Only update if not searching (or clear search if they click hierarchy?)
-                                // Let's clear search if they explicitly interact with hierarchy
                                 if (!searchTerm) {
                                     setEngineId(engineId);
                                     setCategoryId(categoryId);
@@ -155,46 +319,20 @@ export default function POS() {
                 <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
                     {products.length === 0 && (
                         <div style={{ textAlign: 'center', color: 'var(--text-muted)', marginTop: '2rem' }}>
-                            {searchTerm ? 'No products found.' : 'Select Engine and Category to browse products.'}
+                            {loading ? 'Loading products...' : (searchTerm ? 'No products found.' : 'No products available.')}
                         </div>
                     )}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                        {products.map(p => (
-                            <div key={p.id} style={{
-                                background: 'rgba(255,255,255,0.05)',
-                                borderRadius: '8px',
-                                padding: '1rem',
-                                border: '1px solid var(--border-subtle)'
-                            }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                                    <div style={{ fontWeight: 600 }}>{p.name}</div>
-                                    <div style={{ fontFamily: 'var(--font-mono)', opacity: 0.7 }}>{p.part_number}</div>
-                                </div>
-                                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                                    {p.variants && p.variants.map(v => (
-                                        <button key={v.id}
-                                            onClick={() => addToCart(p, v)}
-                                            style={{
-                                                background: 'var(--primary-color)',
-                                                border: 'none',
-                                                borderRadius: '4px',
-                                                padding: '0.5rem',
-                                                cursor: 'pointer',
-                                                color: '#fff',
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                alignItems: 'center',
-                                                minWidth: '80px'
-                                            }}
-                                        >
-                                            <span style={{ fontSize: '0.75rem', opacity: 0.9 }}>{v.supplierName}</span>
-                                            <span style={{ fontWeight: 700 }}>${v.price}</span>
-                                            <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>Stock: {v.stock_quantity}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
+                        {products.slice(0, visibleCount).map(p => (
+                            <POSProductCard key={p.id} product={p} onAddToCart={addToCart} refreshTrigger={refreshTrigger} />
                         ))}
+
+                        {/* Scroll Trigger Element */}
+                        {visibleCount < products.length && (
+                            <div id="scroll-trigger" style={{ height: '20px', textAlign: 'center', opacity: 0.5 }}>
+                                Loading more...
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -228,7 +366,23 @@ export default function POS() {
                         }}>
                             <div>
                                 <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{item.product.name}</div>
-                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{item.variant.supplierName} - ${item.variant.price}</div>
+                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
+                                    <span>{item.variant.supplierName} - $</span>
+                                    <input
+                                        type="number"
+                                        value={item.unitPrice}
+                                        onChange={(e) => updatePrice(item.variantId, e.target.value)}
+                                        style={{
+                                            width: '80px',
+                                            background: 'rgba(255,255,255,0.1)',
+                                            border: '1px solid var(--border-subtle)',
+                                            borderRadius: '4px',
+                                            color: '#fff',
+                                            padding: '0.1rem 0.3rem',
+                                            fontSize: '0.9rem'
+                                        }}
+                                    />
+                                </div>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                 <button onClick={() => updateQuantity(item.variantId, -1)} style={{ padding: '0.25rem 0.5rem', background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer' }}>-</button>
@@ -265,8 +419,8 @@ export default function POS() {
                         style={{
                             width: '100%',
                             padding: '1rem',
-                            background: 'var(--accent-color)',
-                            color: 'var(--bg-dark)',
+                            background: 'var(--danger-color)', // Red color as requested
+                            color: '#fff',
                             border: 'none',
                             borderRadius: '6px',
                             fontWeight: 700,
@@ -281,6 +435,7 @@ export default function POS() {
             </div>
 
             {showHistory && <SalesHistory onClose={() => setShowHistory(false)} />}
+            {currentSaleId && <ReceiptModal saleId={currentSaleId} onClose={() => setCurrentSaleId(null)} />}
         </div>
     );
 }

@@ -1,6 +1,18 @@
-import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { api } from '../api';
+import AdminStatsModal from './AdminStatsModal';
+import { useState } from 'react';
 
 export default function Layout({ children }) {
+    const location = useLocation();
+    const [showStats, setShowStats] = useState(false);
+
+    const getLinkStyle = (path) => ({
+        color: location.pathname === path ? 'var(--accent-primary)' : 'var(--text-primary)',
+        textDecoration: 'none',
+        fontWeight: 500
+    });
+
     return (
         <div className="layout-container">
             <nav className="glass-panel" style={{
@@ -21,12 +33,15 @@ export default function Layout({ children }) {
                 </div>
 
                 <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
-                    <a href="/" style={{ color: 'var(--text-primary)', textDecoration: 'none', fontWeight: 500 }}>Dashboard</a>
-                    <a href="/management" style={{ color: 'var(--text-primary)', textDecoration: 'none', fontWeight: 500 }}>Management</a>
-                    <a href="/pos" style={{ color: 'var(--text-primary)', textDecoration: 'none', fontWeight: 500 }}>POS</a>
+                    <Link to="/" style={getLinkStyle('/')}>Dashboard</Link>
+                    <Link to="/management" style={getLinkStyle('/management')}>Management</Link>
+                    <Link to="/pos" style={getLinkStyle('/pos')}>POS</Link>
                 </div>
 
                 <div style={{ display: 'flex', gap: '1rem' }}>
+                    <button className="btn-primary" onClick={() => setShowStats(true)} style={{ background: 'var(--accent-primary)', border: 'none' }}>
+                        Admin
+                    </button>
                     <button className="btn-primary" style={{ background: 'transparent', border: '1px solid var(--border-highlight)' }}>
                         Settings
                     </button>
@@ -44,6 +59,9 @@ export default function Layout({ children }) {
             }}>
                 {children}
             </main>
+
+            {/* Admin Stats Modal */}
+            {showStats && <AdminStatsModal onClose={() => setShowStats(false)} />}
 
             {/* Background ambient effects */}
             <div style={{

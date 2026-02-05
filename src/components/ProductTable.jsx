@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api';
 
-const ProductRow = ({ product, onEdit }) => {
+const ProductRow = ({ product, onEdit, onDelete }) => {
     const [variants, setVariants] = useState([]);
 
     useEffect(() => {
@@ -19,6 +19,7 @@ const ProductRow = ({ product, onEdit }) => {
                     <div style={{ width: '50px', height: '50px', borderRadius: '4px', overflow: 'hidden', background: '#222', border: '1px solid var(--border-subtle)', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>
                         <img
                             src={product.image_url}
+                            loading="lazy"
                             alt=""
                             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                             onError={e => { e.target.style.display = 'none'; e.target.parentElement.style.background = 'rgba(255,255,255,0.05)'; }}
@@ -56,19 +57,39 @@ const ProductRow = ({ product, onEdit }) => {
                 </div>
             </td>
             <td style={{ padding: '1rem', textAlign: 'right' }}>
-                <button
-                    onClick={() => onEdit(product)}
-                    className="btn-primary"
-                    style={{ fontSize: '0.875rem' }}
-                >
-                    Edit
-                </button>
+                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                    <button
+                        onClick={() => onEdit(product)}
+                        className="btn-primary"
+                        style={{ fontSize: '0.875rem' }}
+                    >
+                        Edit
+                    </button>
+                    <button
+                        onClick={() => {
+                            if (confirm(`Delete ${product.part_number} (${product.name})?`)) {
+                                onDelete(product.id);
+                            }
+                        }}
+                        style={{
+                            background: 'transparent',
+                            border: '1px solid var(--danger-color)',
+                            color: 'var(--danger-color)',
+                            padding: '0.5rem',
+                            borderRadius: 'var(--radius-sm)',
+                            cursor: 'pointer'
+                        }}
+                        title="Delete Product"
+                    >
+                        🗑️
+                    </button>
+                </div>
             </td>
         </tr>
     );
 };
 
-export default function ProductTable({ products, onEdit }) {
+export default function ProductTable({ products, onEdit, onDelete }) {
     if (!products || products.length === 0) {
         return (
             <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
@@ -92,7 +113,7 @@ export default function ProductTable({ products, onEdit }) {
                 </thead>
                 <tbody>
                     {products.map(product => (
-                        <ProductRow key={product.id} product={product} onEdit={onEdit} />
+                        <ProductRow key={product.id} product={product} onEdit={onEdit} onDelete={onDelete} />
                     ))}
                 </tbody>
             </table>

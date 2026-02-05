@@ -85,7 +85,37 @@ export default function Dashboard() {
 
     const handleCloseAdd = () => {
         setIsAddingProduct(false);
-        if (selection.engineId && selection.categoryId) loadProducts();
+        // Always refresh logic to ensure new product shows up even in "Recent" view
+        if (searchMode) {
+            // If searching, maybe re-search? Or just leave it. 
+            // Probably better to clear search or just do nothing if search matches.
+            // But if we are in default view:
+            loadProducts();
+        } else if (selection.engineId && selection.categoryId) {
+            loadProducts(selection.engineId, selection.categoryId);
+        } else {
+            loadProducts(); // Refresh default list
+        }
+    };
+
+    const handleDelete = async (productId) => {
+        try {
+            await api.deleteProduct(productId);
+            // Refresh logic
+            if (searchMode) {
+                // Re-run search or clear? Usually refresh current view.
+                // Ideally we know the search term. For now, let's just clear product from local state to be fast.
+                setProducts(prev => prev.filter(p => p.id !== productId));
+            } else {
+                if (selection.engineId && selection.categoryId) {
+                    loadProducts(selection.engineId, selection.categoryId);
+                } else {
+                    loadProducts();
+                }
+            }
+        } catch (err) {
+            alert('Delete failed: ' + err.message);
+        }
     };
 
     return (
@@ -120,6 +150,7 @@ export default function Dashboard() {
                 <ProductTable
                     products={filteredProducts}
                     onEdit={handleEdit}
+                    onDelete={handleDelete}
                 />
             </div>
 

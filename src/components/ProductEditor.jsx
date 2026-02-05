@@ -295,21 +295,39 @@ export default function ProductEditor({ product, onClose }) {
                     </div>
                 </div>
 
-                <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
                     <button
-                        onClick={onClose}
-                        style={{ padding: '0.75rem 1.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-highlight)' }}
+                        onClick={async () => {
+                            if (confirm(`Delete ENTIRE product ${product.part_number}? This cannot be undone.`)) {
+                                try {
+                                    await api.deleteProduct(product.id);
+                                    onClose(); // Close modal
+                                } catch (err) {
+                                    alert('Delete failed: ' + err.message);
+                                }
+                            }
+                        }}
+                        style={{ padding: '0.75rem 1.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--danger-color)', color: 'var(--danger-color)', background: 'transparent' }}
                     >
-                        Cancel
+                        Delete Product
                     </button>
-                    <button
-                        onClick={handleSave}
-                        className="btn-primary"
-                        style={{ padding: '0.75rem 2rem', opacity: message === 'Saving...' ? 0.5 : 1 }}
-                        disabled={message === 'Saving...'}
-                    >
-                        Save Changes
-                    </button>
+
+                    <div style={{ display: 'flex', gap: '1rem' }}>
+                        <button
+                            onClick={onClose}
+                            style={{ padding: '0.75rem 1.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-highlight)' }}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleSave}
+                            className="btn-primary"
+                            style={{ padding: '0.75rem 2rem', opacity: message === 'Saving...' ? 0.5 : 1 }}
+                            disabled={message === 'Saving...'}
+                        >
+                            Save Changes
+                        </button>
+                    </div>
                 </div>
 
             </div>

@@ -43,6 +43,10 @@ export const api = {
         body: JSON.stringify(data)
     }),
 
+    deleteProduct: (id) => request(`/products/${id}`, {
+        method: 'DELETE'
+    }),
+
     updateProduct: (id, data) => request(`/products/${id}`, {
         method: 'PUT',
         body: JSON.stringify(data)
@@ -72,8 +76,21 @@ export const api = {
         method: 'DELETE'
     }),
 
-    createSale: (data) => request('/sales', {
+    createSale: (saleData) => fetch(`${API_URL}/sales`, {
         method: 'POST',
-        body: JSON.stringify(data)
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(saleData)
+    }).then(res => res.json()),
+
+    getSale: (id) => request(`/sales/${id}`),
+
+    getSales: () => request('/sales'),
+
+    getAdminStats: () => fetch(`${API_URL}/admin/stats`).then(res => res.json()),
+
+    importInventory: (csvText) => request('/inventory/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/csv' },
+        body: csvText
     })
 };

@@ -11,8 +11,8 @@ export default function HierarchySelector({ onSelectionChange }) {
         api.getHierarchy().then(setHierarchy).catch(console.error);
     }, []);
 
-    // Filter engines based on selected manufacturer
-    const availableEngines = hierarchy.engines.filter(e => e.manufacturer_id === parseInt(selectedManuf));
+    // Filter engines based on selected manufacturer (robust comparison)
+    const availableEngines = hierarchy.engines.filter(e => e.manufacturer_id == selectedManuf);
 
     useEffect(() => {
         // Notify parent of changes

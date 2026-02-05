@@ -17,6 +17,12 @@
   --border-subtle: rgba(255, 255, 255, 0.1);
   --border-highlight: rgba(235, 71, 42, 0.3);
 
+  /* Functional Colors */
+  --danger-color: #ef4444;
+  --success-color: #22c55e;
+  --accent-color: var(--accent);
+  --primary-color: var(--primary);
+
   /* Gradients */
   --gradient-primary: linear-gradient(135deg, #eb472a 0%, #c43216 100%);
   --gradient-dark: linear-gradient(180deg, rgba(17, 17, 17, 0) 0%, #000000 100%);

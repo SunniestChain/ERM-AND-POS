@@ -1,9 +1,5 @@
 import React, { useState, useEffect } from 'react';
-
-const api = {
-    getSales: () => fetch('http://localhost:3000/api/sales').then(res => res.json()),
-    getSaleDetails: (id) => fetch(`http://localhost:3000/api/sales/${id}`).then(res => res.json())
-};
+import { api } from '../api';
 
 export default function SalesHistory({ onClose }) {
     const [sales, setSales] = useState([]);
@@ -27,7 +23,8 @@ export default function SalesHistory({ onClose }) {
 
     const handleSelectSale = async (sale) => {
         try {
-            const details = await api.getSaleDetails(sale.id);
+            // Use getSale() from shared api to fetch details
+            const details = await api.getSale(sale.id);
             setSelectedSale(details);
         } catch (error) {
             console.error("Failed to load sale details", error);
@@ -93,31 +90,38 @@ export default function SalesHistory({ onClose }) {
                             <style>
                                 {`
                                 @media print {
+                                    @page { margin: 0; }
                                     body * { visibility: hidden; }
                                     #printable-receipt, #printable-receipt * { visibility: visible; }
                                     #printable-receipt {
                                         position: fixed;
                                         left: 0;
                                         top: 0;
-                                        width: 58mm; /* Standard for 60mm printers */
-                                        font-size: 12px;
-                                        padding: 5px;
+                                        width: 58mm; /* Optimized for 60mm Thermal Printers */
+                                        font-size: 11px;
+                                        padding: 2mm;
                                         margin: 0;
                                         background: white;
+                                        color: black;
+                                        font-family: monospace;
                                     }
-                                    #printable-receipt h2 { font-size: 16px; margin-bottom: 5px; }
+                                    #printable-receipt h2 { font-size: 14px; margin-bottom: 5px; }
                                     #printable-receipt p { margin: 2px 0; }
-                                    #printable-receipt table { width: 100%; font-size: 11px; }
+                                    #printable-receipt table { width: 100%; font-size: 10px; }
                                     #printable-receipt td, #printable-receipt th { padding: 2px 0; }
+                                    #printable-receipt .logo { max-width: 40mm; display: block; margin: 0 auto 5px auto; }
                                     .no-print { display: none !important; }
                                 }
                                 `}
                             </style>
                             <div id="printable-receipt" style={{ padding: '2rem', flex: 1, overflowY: 'auto', fontFamily: 'monospace' }}>
-                                <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-                                    <img src="/logo.png" alt="Mayco Diesel" style={{ maxWidth: '40mm', marginBottom: '10px' }} />
-                                    <h2 style={{ margin: 0, textTransform: 'uppercase' }}>Mayco Diesel</h2>
-                                    <p>Official Receipt</p>
+                                <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+                                    {/* Logo Support: Checks for file usage */}
+                                    <img src="/logo.png" alt="Mayco Diesel" className="logo" style={{ maxWidth: '100px', marginBottom: '10px' }} onError={(e) => e.target.style.display = 'none'} />
+
+                                    <h2 style={{ margin: 0, textTransform: 'uppercase', fontSize: '1.2rem' }}>Mayco Diesel</h2>
+                                    <p style={{ fontSize: '0.9rem' }}>Precision Parts</p>
+                                    <div style={{ borderBottom: '1px dashed #000', margin: '10px 0' }}></div>
                                     <p>Sale #{selectedSale.id}</p>
                                     <p>{new Date(selectedSale.created_at).toLocaleString()}</p>
                                 </div>
@@ -138,32 +142,32 @@ export default function SalesHistory({ onClose }) {
                                                     <div>{item.product_name}</div>
                                                     <div style={{ fontSize: '0.8em', color: '#666' }}>{item.supplier_name}</div>
                                                 </td>
-                                                <td style={{ textAlign: 'center', padding: '0.5rem 0' }}>{item.quantity}</td>
-                                                <td style={{ textAlign: 'right', padding: '0.5rem 0' }}>${item.unit_price.toFixed(2)}</td>
-                                                <td style={{ textAlign: 'right', padding: '0.5rem 0' }}>${item.subtotal.toFixed(2)}</td>
+                                                <td style={{ textAlign: 'center', padding: '0.5rem 0', verticalAlign: 'top' }}>{item.quantity}</td>
+                                                <td style={{ textAlign: 'right', padding: '0.5rem 0', verticalAlign: 'top' }}>${item.unit_price.toFixed(2)}</td>
+                                                <td style={{ textAlign: 'right', padding: '0.5rem 0', verticalAlign: 'top' }}>${item.subtotal.toFixed(2)}</td>
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
 
-                                <div style={{ marginTop: '2rem', borderTop: '2px solid #000', paddingTop: '1rem', display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.2rem' }}>
+                                <div style={{ marginTop: '1rem', borderTop: '2px solid #000', paddingTop: '0.5rem', display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.2rem' }}>
                                     <span>TOTAL</span>
                                     <span>${selectedSale.total_amount.toFixed(2)}</span>
                                 </div>
 
-                                <div style={{ marginTop: '3rem', textAlign: 'center', fontStyle: 'italic', fontSize: '0.8rem' }}>
-                                    Thank you for your business!
+                                <div style={{ marginTop: '2rem', textAlign: 'center', fontStyle: 'italic', fontSize: '0.8rem' }}>
+                                    Thank you!
                                 </div>
                             </div>
                             <div className="no-print" style={{ padding: '1rem', borderTop: '1px solid #ccc', background: '#f5f5f5', display: 'flex', justifyContent: 'flex-end' }}>
-                                <button onClick={() => window.print()} style={{ marginRight: '1rem', padding: '0.5rem 1rem', cursor: 'pointer' }}>Print</button>
-                                <button onClick={() => setSelectedSale(null)} style={{ padding: '0.5rem 1rem', cursor: 'pointer' }}>Close Receipt</button>
+                                <button onClick={() => window.print()} style={{ marginRight: '1rem', padding: '0.5rem 1rem', cursor: 'pointer', background: '#333', color: 'white', border: 'none', borderRadius: '4px' }}>Print Receipt</button>
+                                <button onClick={() => setSelectedSale(null)} style={{ padding: '0.5rem 1rem', cursor: 'pointer', border: '1px solid #ccc', background: 'white', borderRadius: '4px' }}>Close Receipt</button>
                             </div>
                         </>
                     ) : (
                         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', flexDirection: 'column' }}>
                             <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🧾</div>
-                            <div>Select a sale to view details</div>
+                            <div>Select a sale from the list</div>
                         </div>
                     )}
                 </div>

@@ -29,4 +29,6 @@ api/public
 server.zip
 # erm.db (Not ignored so it uploads to Vercel)
 
-
+# Environment Variables
+.env
+.env.*
