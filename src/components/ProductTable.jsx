@@ -99,7 +99,7 @@ export default function ProductTable({ products, onEdit, onDelete }) {
     }
 
     return (
-        <div className="glass-panel" style={{ overflow: 'hidden' }}>
+        <div className="glass-panel table-container" style={{ overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead>
                     <tr style={{ borderBottom: '1px solid var(--border-highlight)' }}>

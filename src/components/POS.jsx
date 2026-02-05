@@ -279,10 +279,53 @@ export default function POS() {
         }
     };
 
+    // Mobile View State
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 900);
+    const [mobileTab, setMobileTab] = useState('products'); // 'products' or 'cart'
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 900);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
     return (
-        <div style={{ display: 'flex', height: 'calc(100vh - 80px)', gap: '1rem', padding: '1rem' }}>
-            {/* LEFT PANEL: Product Browser */}
-            <div className="glass-panel" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{
+            display: 'flex',
+            flexDirection: isMobile ? 'column' : 'row',
+            height: 'calc(100vh - 100px)', // adjusted for margin
+            gap: '1rem',
+            padding: isMobile ? '0.5rem' : '1rem',
+            position: 'relative'
+        }}>
+            {/* Mobile Tab Switcher */}
+            {isMobile && (
+                <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.5rem' }}>
+                    <button
+                        onClick={() => setMobileTab('products')}
+                        className="btn-primary"
+                        style={{ flex: 1, background: mobileTab === 'products' ? 'var(--accent-primary)' : 'rgba(255,255,255,0.1)', border: 'none' }}
+                    >
+                        Browser
+                    </button>
+                    <button
+                        onClick={() => setMobileTab('cart')}
+                        className="btn-primary"
+                        style={{ flex: 1, background: mobileTab === 'cart' ? 'var(--accent-primary)' : 'rgba(255,255,255,0.1)', border: 'none', position: 'relative' }}
+                    >
+                        Cart ({cart.reduce((a, c) => a + c.quantity, 0)})
+                        {cart.length > 0 && <span style={{ position: 'absolute', top: -5, right: -5, background: 'red', borderRadius: '50%', width: '20px', height: '20px', fontSize: '0.8rem' }}>!</span>}
+                    </button>
+                </div>
+            )}
+
+            {/* LEFT PANEL: Product Browser (Hidden on mobile if tab is cart) */}
+            <div className="glass-panel" style={{
+                flex: 1,
+                display: (!isMobile || mobileTab === 'products') ? 'flex' : 'none',
+                flexDirection: 'column',
+                overflow: 'hidden'
+            }}>
                 <h2 style={{ padding: '1rem', borderBottom: '1px solid var(--border-subtle)', margin: 0 }}>Product Browser</h2>
 
                 <div style={{ padding: '1rem', borderBottom: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -324,7 +367,13 @@ export default function POS() {
                     )}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                         {products.slice(0, visibleCount).map(p => (
-                            <POSProductCard key={p.id} product={p} onAddToCart={addToCart} refreshTrigger={refreshTrigger} />
+                            <POSProductCard key={p.id} product={p} onAddToCart={(p, v) => {
+                                addToCart(p, v);
+                                if (isMobile) {
+                                    setMessage("Added to Cart");
+                                    setTimeout(() => setMessage(''), 1500);
+                                }
+                            }} refreshTrigger={refreshTrigger} />
                         ))}
 
                         {/* Scroll Trigger Element */}
@@ -335,11 +384,21 @@ export default function POS() {
                         )}
                     </div>
                 </div>
+
+                {/* Float Message on Mobile */}
+                {isMobile && message && (
+                    <div style={{ position: 'absolute', bottom: '20px', left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,0.8)', padding: '0.5rem 1rem', borderRadius: '20px', color: 'white' }}>{message}</div>
+                )}
             </div>
 
 
-            {/* RIGHT PANEL: Cart */}
-            <div className="glass-panel" style={{ width: '400px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            {/* RIGHT PANEL: Cart (Hidden on mobile if tab is products) */}
+            <div className="glass-panel" style={{
+                width: isMobile ? '100%' : '400px', // Responsive width
+                display: (!isMobile || mobileTab === 'cart') ? 'flex' : 'none',
+                flexDirection: 'column',
+                overflow: 'hidden'
+            }}>
                 <div style={{ padding: '1rem', borderBottom: '1px solid var(--border-subtle)', margin: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <h2 style={{ margin: 0 }}>Current Ticket</h2>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -395,7 +454,7 @@ export default function POS() {
                 </div>
 
                 <div style={{ padding: '1rem', borderTop: '1px solid var(--border-subtle)', background: 'rgba(0,0,0,0.2)' }}>
-                    {message && (
+                    {message && !isMobile && (
                         <div style={{
                             padding: '0.75rem',
                             borderRadius: '4px',

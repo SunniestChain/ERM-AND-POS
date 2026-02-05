@@ -8,12 +8,48 @@ export default function Layout({ children }) {
     const location = useLocation();
     const [showStats, setShowStats] = useState(false);
     const { user, logout } = useAuth();
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     const getLinkStyle = (path) => ({
         color: location.pathname === path ? 'var(--accent-primary)' : 'var(--text-primary)',
         textDecoration: 'none',
-        fontWeight: 500
+        fontWeight: 500,
+        padding: isMobile ? '1rem 0' : '0',
+        borderBottom: isMobile ? '1px solid rgba(255,255,255,0.1)' : 'none',
+        display: 'block'
     });
+
+    const NavContent = () => (
+        <>
+            <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '0' : '2rem', alignItems: isMobile ? 'stretch' : 'center', width: isMobile ? '100%' : 'auto' }}>
+                {user?.role === 'admin' && (
+                    <>
+                        <Link to="/" style={getLinkStyle('/')} onClick={() => setIsMobileMenuOpen(false)}>Dashboard</Link>
+                        <Link to="/management" style={getLinkStyle('/management')} onClick={() => setIsMobileMenuOpen(false)}>Management</Link>
+                    </>
+                )}
+                <Link to="/pos" style={getLinkStyle('/pos')} onClick={() => setIsMobileMenuOpen(false)}>POS</Link>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '1rem', alignItems: isMobile ? 'stretch' : 'center', marginTop: isMobile ? '1rem' : '0' }}>
+                {user?.role === 'admin' && (
+                    <button className="btn-primary" onClick={() => { setShowStats(true); setIsMobileMenuOpen(false); }} style={{ background: 'var(--accent-primary)', border: 'none' }}>
+                        Admin
+                    </button>
+                )}
+                <button onClick={logout} className="btn-primary" style={{ background: 'transparent', border: '1px solid var(--border-highlight)' }}>
+                    Logout
+                </button>
+            </div>
+        </>
+    );
 
     return (
         <div className="layout-container">
@@ -22,43 +58,41 @@ export default function Layout({ children }) {
                 top: 0,
                 left: 0,
                 right: 0,
-                height: '70px',
+                height: isMobileMenuOpen ? 'auto' : '70px',
                 zIndex: 100,
                 display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '0 2rem'
+                flexDirection: 'column',
+                padding: '0 2rem',
+                transition: 'height 0.3s ease',
+                overflow: 'hidden'
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    {/* Logo Removed */}
-                    <img src="/logo.png" alt="ERM Inventory" style={{ height: '45px', objectFit: 'contain' }} />
-                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '70px', flexShrink: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <img src="/logo.png" alt="ERM Inventory" style={{ height: '45px', objectFit: 'contain' }} />
+                    </div>
 
-                <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
-                    {user?.role === 'admin' && (
-                        <>
-                            <Link to="/" style={getLinkStyle('/')}>Dashboard</Link>
-                            <Link to="/management" style={getLinkStyle('/management')}>Management</Link>
-                        </>
-                    )}
-                    <Link to="/pos" style={getLinkStyle('/pos')}>POS</Link>
-                </div>
-
-                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                    {user?.role === 'admin' && (
-                        <button className="btn-primary" onClick={() => setShowStats(true)} style={{ background: 'var(--accent-primary)', border: 'none' }}>
-                            Admin
+                    {isMobile ? (
+                        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} style={{ background: 'none', border: 'none', color: 'white', fontSize: '1.5rem', cursor: 'pointer' }}>
+                            {isMobileMenuOpen ? '✕' : '☰'}
                         </button>
+                    ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem', flex: 1, justifyContent: 'flex-end' }}>
+                            <NavContent />
+                        </div>
                     )}
-                    <button onClick={logout} className="btn-primary" style={{ background: 'transparent', border: '1px solid var(--border-highlight)' }}>
-                        Logout
-                    </button>
                 </div>
+
+                {/* Mobile Dropdown */}
+                {isMobile && isMobileMenuOpen && (
+                    <div style={{ padding: '0 0 1rem 0', display: 'flex', flexDirection: 'column' }}>
+                        <NavContent />
+                    </div>
+                )}
             </nav>
 
             <main style={{
                 marginTop: '90px',
-                padding: '0 2rem',
+                padding: isMobile ? '0 1rem' : '0 2rem', // Responsive padding
                 height: 'calc(100vh - 90px)',
                 overflowY: 'auto'
             }}>
