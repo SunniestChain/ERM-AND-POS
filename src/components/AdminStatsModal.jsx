@@ -46,7 +46,7 @@ export default function AdminStatsModal({ onClose }) {
                 borderRadius: '12px',
                 width: '90%',
                 maxWidth: '900px',
-                padding: '2rem',
+                padding: '1.25rem',
                 position: 'relative',
                 boxShadow: '0 20px 50px rgba(0,0,0,0.5)'
             }} onClick={e => e.stopPropagation()}>

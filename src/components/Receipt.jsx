@@ -4,7 +4,7 @@ export default function Receipt({ sale, onClose }) {
     if (!sale) return null;
 
     return (
-        <div style={{ padding: '2rem', flex: 1, overflowY: 'auto', fontFamily: 'monospace', background: 'white', color: 'black' }}>
+        <div style={{ padding: '1.25rem', flex: 1, overflowY: 'auto', fontFamily: 'monospace', background: 'white', color: 'black' }}>
             <style>
                 {`
                 @media print {

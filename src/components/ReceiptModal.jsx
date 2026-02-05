@@ -37,7 +37,8 @@ export default function ReceiptModal({ saleId, onClose }) {
             <div style={{
                 background: '#fff',
                 color: '#000',
-                width: '400px',
+                width: '95%',
+                maxWidth: '400px',
                 borderRadius: '8px',
                 boxShadow: '0 10px 40px rgba(0,0,0,0.5)',
                 position: 'relative',

@@ -6,9 +6,13 @@ export default function HierarchySelector({ onSelectionChange }) {
     const [selectedManuf, setSelectedManuf] = useState('');
     const [selectedEngine, setSelectedEngine] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('');
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
     useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener('resize', handleResize);
         api.getHierarchy().then(setHierarchy).catch(console.error);
+        return () => window.removeEventListener('resize', handleResize);
     }, []);
 
     // Filter engines based on selected manufacturer (robust comparison)
@@ -23,11 +27,35 @@ export default function HierarchySelector({ onSelectionChange }) {
         });
     }, [selectedManuf, selectedEngine, selectedCategory]);
 
+    const containerStyle = isMobile ? {
+        padding: '1rem',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.5rem'
+    } : {
+        padding: '1.25rem',
+        display: 'grid',
+        gridTemplateColumns: '1fr auto 1fr auto 1fr',
+        gap: '1.5rem',
+        alignItems: 'center'
+    };
+
+    const Arrow = () => (
+        <div style={{
+            color: 'var(--text-muted)',
+            paddingTop: isMobile ? '0' : '1.2rem',
+            textAlign: 'center',
+            fontSize: isMobile ? '1.2rem' : '1rem'
+        }}>
+            {isMobile ? '↓' : '➔'}
+        </div>
+    );
+
     return (
-        <div className="glass-panel" style={{ padding: '1.25rem', display: 'grid', gridTemplateColumns: '1fr auto 1fr auto 1fr', gap: '1.5rem', alignItems: 'center' }}>
+        <div className="glass-panel" style={containerStyle}>
 
             {/* 1. Manufacturer */}
-            <div>
+            <div style={{ width: '100%' }}>
                 <label style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '0.5rem', fontSize: '0.8rem' }}>MANUFACTURER</label>
                 <select
                     value={selectedManuf}
@@ -44,10 +72,10 @@ export default function HierarchySelector({ onSelectionChange }) {
                 </select>
             </div>
 
-            <div style={{ color: 'var(--text-muted)', paddingTop: '1.2rem' }}>➔</div>
+            <Arrow />
 
             {/* 2. Engine */}
-            <div>
+            <div style={{ width: '100%' }}>
                 <label style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '0.5rem', fontSize: '0.8rem' }}>ENGINE</label>
                 <select
                     value={selectedEngine}
@@ -62,10 +90,10 @@ export default function HierarchySelector({ onSelectionChange }) {
                 </select>
             </div>
 
-            <div style={{ color: 'var(--text-muted)', paddingTop: '1.2rem' }}>➔</div>
+            <Arrow />
 
             {/* 3. Category */}
-            <div>
+            <div style={{ width: '100%' }}>
                 <label style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '0.5rem', fontSize: '0.8rem' }}>CATEGORY</label>
                 <select
                     value={selectedCategory}
