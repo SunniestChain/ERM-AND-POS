@@ -1,75 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
-
-// Initialize Stripe outside component to avoid rebuilding
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
-
-const CheckoutForm = ({ amount, onSuccess, onCancel }) => {
-    const stripe = useStripe();
-    const elements = useElements();
-    const [message, setMessage] = useState('');
-    const [isProcessing, setIsProcessing] = useState(false);
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (!stripe || !elements) return;
-
-        setIsProcessing(true);
-
-        const { error, paymentIntent } = await stripe.confirmPayment({
-            elements,
-            confirmParams: {
-                return_url: window.location.origin, // Not really used for redirect: 'if_required' usually default or handled via redirect
-            },
-            redirect: 'if_required'
-        });
-
-        if (error) {
-            setMessage(error.message);
-            setIsProcessing(false);
-        } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-            onSuccess(paymentIntent);
-        } else {
-            setMessage("Payment status: " + paymentIntent.status);
-            setIsProcessing(false);
-        }
-    };
-
-    return (
-        <form onSubmit={handleSubmit}>
-            <PaymentElement />
-            {message && <div style={{ color: 'red', marginTop: '1rem' }}>{message}</div>}
-            <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                <button type="button" onClick={onCancel} disabled={isProcessing} style={{ padding: '0.75rem', flex: 1, borderRadius: '6px', border: '1px solid #ccc' }}>Cancel</button>
-                <button type="submit" disabled={isProcessing || !stripe || !elements} className="btn-primary" style={{ padding: '0.75rem', flex: 1 }}>
-                    {isProcessing ? "Processing..." : `Pay $${amount.toFixed(2)}`}
-                </button>
-            </div>
-        </form>
-    );
-};
 
 const PaymentModal = ({ total, onConfirm, onClose }) => {
     const [amountPaid, setAmountPaid] = useState('');
     const [paymentMethod, setPaymentMethod] = useState('Cash');
     const [change, setChange] = useState(0);
-    const [clientSecret, setClientSecret] = useState('');
-
-    useEffect(() => {
-        if (paymentMethod === 'Card') {
-            // Fetch Client Secret
-            fetch('/api/create-payment-intent', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ amount: total })
-            })
-                .then(res => res.json())
-                .then(data => setClientSecret(data.clientSecret));
-        } else {
-            setClientSecret('');
-        }
-    }, [paymentMethod, total]);
 
     useEffect(() => {
         // Auto-fill amount paid with total if it's card/transfer
@@ -85,7 +19,7 @@ const PaymentModal = ({ total, onConfirm, onClose }) => {
 
     const handleConfirm = () => {
         const paid = parseFloat(amountPaid) || 0;
-        if (paid < total - 0.01) { // Tolerance for floating point
+        if (paid < total - 0.01) {
             alert("Insufficient payment amount.");
             return;
         }
@@ -152,57 +86,65 @@ const PaymentModal = ({ total, onConfirm, onClose }) => {
                     </div>
                 </div>
 
-                <div style={{ marginBottom: '1.5rem' }}>
-                    <label style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Amount Tendered</label>
-                    <input
-                        type="number"
-                        value={amountPaid}
-                        onChange={e => setAmountPaid(e.target.value)}
-                        placeholder="0.00"
-                        autoFocus
-                        style={{
-                            width: '100%',
-                            padding: '1rem',
-                            fontSize: '1.5rem',
-                            textAlign: 'right',
-                            background: 'rgba(255,255,255,0.1)',
-                            border: '1px solid var(--border-subtle)',
-                            borderRadius: '6px',
-                            color: '#fff'
-                        }}
-                    />
+                {paymentMethod === 'Card' ? (
+                    <div style={{ textAlign: 'center', marginBottom: '2rem', padding: '1rem', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '6px', border: '1px dashed #3b82f6' }}>
+                        <p style={{ marginBottom: '0.5rem', color: '#fff' }}>You will be redirected to Stripe to complete the secure payment.</p>
+                    </div>
+                ) : (
+                    <>
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <label style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Amount Tendered</label>
+                            <input
+                                type="number"
+                                value={amountPaid}
+                                onChange={e => setAmountPaid(e.target.value)}
+                                placeholder="0.00"
+                                autoFocus
+                                style={{
+                                    width: '100%',
+                                    padding: '1rem',
+                                    fontSize: '1.5rem',
+                                    textAlign: 'right',
+                                    background: 'rgba(255,255,255,0.1)',
+                                    border: '1px solid var(--border-subtle)',
+                                    borderRadius: '6px',
+                                    color: '#fff'
+                                }}
+                            />
 
-                    {/* Quick Cash Buttons */}
-                    {paymentMethod === 'Cash' && quickCashOptions.length > 0 && (
-                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
-                            {quickCashOptions.map(opt => (
-                                <button
-                                    key={opt}
-                                    onClick={() => setAmountPaid(opt.toFixed(2))}
-                                    style={{
-                                        flex: 1,
-                                        padding: '0.5rem',
-                                        background: 'rgba(255,255,255,0.05)',
-                                        border: '1px solid var(--border-subtle)',
-                                        borderRadius: '4px',
-                                        cursor: 'pointer',
-                                        color: 'var(--text-muted)',
-                                        fontSize: '0.9rem'
-                                    }}
-                                >
-                                    ${opt}
-                                </button>
-                            ))}
+                            {/* Quick Cash Buttons */}
+                            {paymentMethod === 'Cash' && quickCashOptions.length > 0 && (
+                                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                                    {quickCashOptions.map(opt => (
+                                        <button
+                                            key={opt}
+                                            onClick={() => setAmountPaid(opt.toFixed(2))}
+                                            style={{
+                                                flex: 1,
+                                                padding: '0.5rem',
+                                                background: 'rgba(255,255,255,0.05)',
+                                                border: '1px solid var(--border-subtle)',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer',
+                                                color: 'var(--text-muted)',
+                                                fontSize: '0.9rem'
+                                            }}
+                                        >
+                                            ${opt}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
-                    )}
-                </div>
 
-                <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: 'rgba(0,0,0,0.3)', borderRadius: '6px' }}>
-                    <span style={{ color: 'var(--text-muted)' }}>Change Due:</span>
-                    <span style={{ fontSize: '1.5rem', fontWeight: 700, color: change < 0 ? '#ff6b6b' : '#4ade80' }}>
-                        ${Math.max(0, change).toFixed(2)}
-                    </span>
-                </div>
+                        <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: 'rgba(0,0,0,0.3)', borderRadius: '6px' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>Change Due:</span>
+                            <span style={{ fontSize: '1.5rem', fontWeight: 700, color: change < 0 ? '#ff6b6b' : '#4ade80' }}>
+                                ${Math.max(0, change).toFixed(2)}
+                            </span>
+                        </div>
+                    </>
+                )}
 
                 <div style={{ display: 'flex', gap: '1rem' }}>
                     <button
@@ -229,7 +171,7 @@ const PaymentModal = ({ total, onConfirm, onClose }) => {
                             fontWeight: 700
                         }}
                     >
-                        Finish Sale
+                        {paymentMethod === 'Card' ? 'Proceed to Stripe' : 'Finish Sale'}
                     </button>
                 </div>
             </div>

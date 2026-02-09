@@ -37,6 +37,36 @@ app.post('/api/create-payment-intent', async (req, res) => {
     }
 });
 
+app.post('/api/create-checkout-session', async (req, res) => {
+    try {
+        const { amount } = req.body;
+        const amountInCents = Math.round(Number(amount) * 100);
+        const origin = req.headers.origin || 'http://localhost:5173';
+
+        const session = await stripe.checkout.sessions.create({
+            line_items: [
+                {
+                    price_data: {
+                        currency: 'mxn',
+                        product_data: {
+                            name: 'POS Sale Total',
+                        },
+                        unit_amount: amountInCents,
+                    },
+                    quantity: 1,
+                },
+            ],
+            mode: 'payment',
+            success_url: `${origin}/?success=true&session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${origin}/?canceled=true`,
+        });
+
+        res.json({ url: session.url });
+    } catch (e) {
+        handleError(res, e);
+    }
+});
+
 // --- API Endpoints ---
 
 // 1. Get Products with Filtering & Search

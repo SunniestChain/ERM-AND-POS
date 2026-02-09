@@ -137,6 +137,78 @@ export default function POS() {
     const [refreshTrigger, setRefreshTrigger] = useState(0); // Forces re-fetch of stock
 
     // ... (UseEffect and Loaders same as original) ...
+    // Stripe Return Logic
+    useEffect(() => {
+        const query = new URLSearchParams(window.location.search);
+
+        if (query.get('success')) {
+            const pendingSale = localStorage.getItem('pending_pos_sale');
+            if (pendingSale) {
+                const saleData = JSON.parse(pendingSale);
+                setLoading(true);
+                api.createSale(saleData).then(result => {
+                    if (result.success) {
+                        setMessage(`Sale #${result.saleId} completed via Stripe!`);
+                        setCart([]);
+                        setCurrentSaleId(result.saleId);
+                        setRefreshTrigger(prev => prev + 1);
+                        localStorage.removeItem('pending_pos_sale');
+                        localStorage.removeItem('pos_cart_backup');
+
+                        // Clean URL
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                    }
+                }).catch(err => {
+                    setMessage('Error finalizing Stripe sale: ' + err.message);
+                }).finally(() => setLoading(false));
+            }
+        } else if (query.get('canceled')) {
+            setMessage("Payment Canceled");
+            const backupCart = localStorage.getItem('pos_cart_backup');
+            if (backupCart) {
+                setCart(JSON.parse(backupCart));
+            }
+            // Clean URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    }, []);
+
+    // Stripe Return Logic
+    useEffect(() => {
+        const query = new URLSearchParams(window.location.search);
+
+        if (query.get('success')) {
+            const pendingSale = localStorage.getItem('pending_pos_sale');
+            if (pendingSale) {
+                const saleData = JSON.parse(pendingSale);
+                setLoading(true);
+                api.createSale(saleData).then(result => {
+                    if (result.success) {
+                        setMessage(`Sale #${result.saleId} completed via Stripe!`);
+                        setCart([]);
+                        setCurrentSaleId(result.saleId);
+                        setRefreshTrigger(prev => prev + 1);
+                        localStorage.removeItem('pending_pos_sale');
+                        localStorage.removeItem('pos_cart_backup');
+
+                        // Clean URL
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                    }
+                }).catch(err => {
+                    setMessage('Error finalizing Stripe sale: ' + err.message);
+                }).finally(() => setLoading(false));
+            }
+        } else if (query.get('canceled')) {
+            setMessage("Payment Canceled");
+            const backupCart = localStorage.getItem('pos_cart_backup');
+            if (backupCart) {
+                setCart(JSON.parse(backupCart));
+            }
+            // Clean URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    }, []);
+
     // Fetch products when filters OR search change
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -256,6 +328,48 @@ export default function POS() {
     };
 
     const handlePaymentConfirm = async (paymentData) => {
+        // Stripe Redirect Flow
+        if (paymentData.paymentMethod === 'Card') {
+            setLoading(true);
+            try {
+                // 1. Prepare Sale Data
+                const saleData = {
+                    items: cart.map(item => ({
+                        variantId: item.variantId,
+                        quantity: item.quantity,
+                        unitPrice: item.unitPrice,
+                        productName: item.product.name,
+                        supplierName: item.variant.supplierName
+                    })),
+                    ...paymentData
+                };
+
+                // 2. Save State for Return
+                localStorage.setItem('pending_pos_sale', JSON.stringify(saleData));
+                localStorage.setItem('pos_cart_backup', JSON.stringify(cart));
+
+                // 3. Get Session URL
+                const response = await fetch('/api/create-checkout-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ amount: cartTotal })
+                });
+                const session = await response.json();
+
+                if (session.url) {
+                    window.location.href = session.url;
+                } else {
+                    alert("Error initiating payment");
+                    setLoading(false);
+                }
+            } catch (err) {
+                alert("Error: " + err.message);
+                setLoading(false);
+            }
+            return;
+        }
+
+        // Manual Payment Flow (Cash, Transfer)
         setLoading(true);
         setShowPaymentModal(false);
         try {
