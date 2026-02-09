@@ -183,6 +183,18 @@ export default function ProductEditor({ product, onClose }) {
                         />
                     </div>
 
+                    <div style={{ marginBottom: '1.5rem' }}>
+                        <label style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Reference Numbers (Comma separated)</label>
+                        <textarea
+                            name="reference_numbers"
+                            value={formData.reference_numbers || ''}
+                            onChange={handleMasterChange}
+                            rows={2}
+                            placeholder="e.g. 12345, ABC-99, OEM-555"
+                            style={{ width: '100%', padding: '0.75rem', background: 'rgba(255,255,255,0.05)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', resize: 'vertical' }}
+                        />
+                    </div>
+
                     {/* Compatible Engines Section */}
                     <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>

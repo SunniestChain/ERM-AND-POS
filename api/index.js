@@ -33,7 +33,24 @@ app.get('/api/products', async (req, res) => {
         `);
 
         if (search) {
-            query = query.or(`part_number.ilike.%${search}%,name.ilike.%${search}%,description.ilike.%${search}%`);
+            // 1. Search SKUs in variants first
+            const { data: skuVariants } = await supabase
+                .from('product_variants')
+                .select('product_id')
+                .ilike('sku', `%${search}%`);
+
+            let skuIds = [];
+            if (skuVariants) {
+                skuIds = skuVariants.map(v => v.product_id);
+            }
+
+            let orClause = `part_number.ilike.%${search}%,name.ilike.%${search}%,description.ilike.%${search}%`;
+            if (skuIds.length > 0) {
+                const uniqueIds = [...new Set(skuIds)];
+                // Postgres filter syntax for IN: id.in.(1,2,3)
+                orClause += `,id.in.(${uniqueIds.join(',')})`;
+            }
+            query = query.or(orClause);
         }
 
         // Filter by Engine (Many-to-Many)
@@ -253,12 +270,12 @@ app.get('/api/admin/stats', async (req, res) => {
 // Update Product
 app.put('/api/products/:id', async (req, res) => {
     try {
-        const { part_number, name, description, notes, image_url, engineIds } = req.body;
+        const { part_number, name, description, notes, image_url, engineIds, reference_numbers } = req.body;
 
         // 1. Update Product Details
         const { error } = await supabase
             .from('products')
-            .update({ part_number, name, description, notes, image_url })
+            .update({ part_number, name, description, notes, image_url, reference_numbers })
             .eq('id', req.params.id);
         if (error) throw error;
 
@@ -372,6 +389,7 @@ app.get('/api/inventory/export', async (req, res) => {
                     description,
                     notes,
                     image_url,
+                    reference_numbers,
                     category:categories(name),
                     engine:engines(
                         name,
@@ -396,7 +414,8 @@ app.get('/api/inventory/export', async (req, res) => {
             Bin: v.bin_location || '',
             Image: v.product?.image_url || '',
             SKU: v.sku || '',
-            Notes: v.product?.notes || ''
+            Notes: v.product?.notes || '',
+            ReferenceNumbers: v.product?.reference_numbers || ''
         }));
 
         const csv = toCSV(rows);
@@ -432,7 +451,8 @@ app.post('/api/inventory/import', bodyParser.text({ type: 'text/*' }), async (re
         bin: headers.findIndex(h => h === 'binlocation' || h === 'bin'),
         image: headers.indexOf('image'),
         sku: headers.indexOf('sku'),
-        notes: headers.indexOf('notes')
+        notes: headers.indexOf('notes'),
+        referenceNumbers: headers.findIndex(h => h === 'referencenumbers' || h === 'reference' || h === 'refs')
     };
 
     console.log("CSV Header Mapping:", idx);
@@ -499,6 +519,7 @@ app.post('/api/inventory/import', bodyParser.text({ type: 'text/*' }), async (re
                 const image = idx.image !== -1 ? cols[idx.image] : '';
                 const sku = idx.sku !== -1 ? cols[idx.sku] : '';
                 const notes = idx.notes !== -1 ? cols[idx.notes] : '';
+                const refNums = idx.referenceNumbers !== -1 ? cols[idx.referenceNumbers] : '';
 
                 if (!partNumber || !supplierName) continue;
 
@@ -545,6 +566,7 @@ app.post('/api/inventory/import', bodyParser.text({ type: 'text/*' }), async (re
                     if (image) updates.image_url = image;
                     if (description) updates.description = description;
                     if (notes) updates.notes = notes;
+                    if (refNums) updates.reference_numbers = refNums;
                     // Only update FKs if we found new ones (don't overwrite with null)
                     if (engineId) updates.engine_id = engineId;
                     if (catId) updates.category_id = catId;
@@ -560,7 +582,8 @@ app.post('/api/inventory/import', bodyParser.text({ type: 'text/*' }), async (re
                         notes: notes,
                         engine_id: engineId, // can be null
                         category_id: catId,  // can be null
-                        image_url: image
+                        image_url: image,
+                        reference_numbers: refNums
                     }).select('id').single();
                     if (newP) prodId = newP.id;
                 }
