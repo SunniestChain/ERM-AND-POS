@@ -58,15 +58,25 @@ const PaymentModal = ({ total, onConfirm, onClose }) => {
     const [change, setChange] = useState(0);
     const [clientSecret, setClientSecret] = useState('');
 
+    const API_URL = import.meta.env.PROD ? '' : 'http://localhost:3000';
+
     useEffect(() => {
         if (paymentMethod === 'Card') {
-            fetch('/api/create-payment-intent', {
+            fetch(`${API_URL}/api/create-payment-intent`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ amount: total })
             })
-                .then(res => res.json())
-                .then(data => setClientSecret(data.clientSecret));
+                .then(res => {
+                    if (!res.ok) throw new Error("API call failed");
+                    return res.json();
+                })
+                .then(data => {
+                    setClientSecret(data.clientSecret);
+                })
+                .catch(err => {
+                    console.error("Error fetching payment intent:", err);
+                });
         } else {
             setClientSecret('');
         }
