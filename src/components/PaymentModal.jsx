@@ -1,12 +1,78 @@
 import React, { useState, useEffect } from 'react';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+
+// Initialize Stripe
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+
+const CheckoutForm = ({ amount, onSuccess, onCancel }) => {
+    const stripe = useStripe();
+    const elements = useElements();
+    const [message, setMessage] = useState('');
+    const [isProcessing, setIsProcessing] = useState(false);
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!stripe || !elements) return;
+
+        setIsProcessing(true);
+
+        const { error, paymentIntent } = await stripe.confirmPayment({
+            elements,
+            confirmParams: {
+                // If redirect is strictly required by payment method, it will go here.
+                // But for cards, it often handles inline or 'if_required'.
+                return_url: window.location.origin,
+            },
+            redirect: 'if_required'
+        });
+
+        if (error) {
+            setMessage(error.message);
+            setIsProcessing(false);
+        } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+            onSuccess(paymentIntent);
+        } else {
+            setMessage("Payment status: " + paymentIntent.status);
+            setIsProcessing(false);
+        }
+    };
+
+    return (
+        <form onSubmit={handleSubmit}>
+            <PaymentElement />
+            {message && <div style={{ color: 'red', marginTop: '1rem' }}>{message}</div>}
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                <button type="button" onClick={onCancel} disabled={isProcessing} style={{ padding: '0.75rem', flex: 1, borderRadius: '6px', border: '1px solid #ccc' }}>Cancel</button>
+                <button type="submit" disabled={isProcessing || !stripe || !elements} className="btn-primary" style={{ padding: '0.75rem', flex: 1 }}>
+                    {isProcessing ? "Processing..." : `Pay $${amount.toFixed(2)}`}
+                </button>
+            </div>
+        </form>
+    );
+};
 
 const PaymentModal = ({ total, onConfirm, onClose }) => {
     const [amountPaid, setAmountPaid] = useState('');
     const [paymentMethod, setPaymentMethod] = useState('Cash');
     const [change, setChange] = useState(0);
+    const [clientSecret, setClientSecret] = useState('');
 
     useEffect(() => {
-        // Auto-fill amount paid with total if it's card/transfer
+        if (paymentMethod === 'Card') {
+            fetch('/api/create-payment-intent', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ amount: total })
+            })
+                .then(res => res.json())
+                .then(data => setClientSecret(data.clientSecret));
+        } else {
+            setClientSecret('');
+        }
+    }, [paymentMethod, total]);
+
+    useEffect(() => {
         if (paymentMethod !== 'Cash') {
             setAmountPaid(total.toFixed(2));
         }
@@ -86,10 +152,21 @@ const PaymentModal = ({ total, onConfirm, onClose }) => {
                     </div>
                 </div>
 
-                {paymentMethod === 'Card' ? (
-                    <div style={{ textAlign: 'center', marginBottom: '2rem', padding: '1rem', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '6px', border: '1px dashed #3b82f6' }}>
-                        <p style={{ marginBottom: '0.5rem', color: '#fff' }}>You will be redirected to Stripe to complete the secure payment.</p>
-                    </div>
+                {paymentMethod === 'Card' && clientSecret ? (
+                    <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: 'night' } }}>
+                        <CheckoutForm
+                            amount={total}
+                            onSuccess={(paymentIntent) => {
+                                onConfirm({
+                                    paymentMethod: 'Card',
+                                    amountPaid: total,
+                                    change: 0,
+                                    transactionId: paymentIntent.id
+                                });
+                            }}
+                            onCancel={() => setPaymentMethod('Cash')}
+                        />
+                    </Elements>
                 ) : (
                     <>
                         <div style={{ marginBottom: '1.5rem' }}>
@@ -143,37 +220,37 @@ const PaymentModal = ({ total, onConfirm, onClose }) => {
                                 ${Math.max(0, change).toFixed(2)}
                             </span>
                         </div>
+
+                        <div style={{ display: 'flex', gap: '1rem' }}>
+                            <button
+                                onClick={onClose}
+                                style={{
+                                    flex: 1,
+                                    padding: '1rem',
+                                    background: 'transparent',
+                                    border: '1px solid var(--border-subtle)',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    color: 'var(--text-muted)'
+                                }}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleConfirm}
+                                className="btn-primary"
+                                style={{
+                                    flex: 2,
+                                    padding: '1rem',
+                                    fontSize: '1.1rem',
+                                    fontWeight: 700
+                                }}
+                            >
+                                Finish Sale
+                            </button>
+                        </div>
                     </>
                 )}
-
-                <div style={{ display: 'flex', gap: '1rem' }}>
-                    <button
-                        onClick={onClose}
-                        style={{
-                            flex: 1,
-                            padding: '1rem',
-                            background: 'transparent',
-                            border: '1px solid var(--border-subtle)',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            color: 'var(--text-muted)'
-                        }}
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleConfirm}
-                        className="btn-primary"
-                        style={{
-                            flex: 2,
-                            padding: '1rem',
-                            fontSize: '1.1rem',
-                            fontWeight: 700
-                        }}
-                    >
-                        {paymentMethod === 'Card' ? 'Proceed to Stripe' : 'Finish Sale'}
-                    </button>
-                </div>
             </div>
         </div>
     );
