@@ -16,6 +16,27 @@ const handleError = (res, err) => {
     res.status(500).json({ error: err.message });
 };
 
+// --- Stripe ---
+import Stripe from 'stripe';
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+app.post('/api/create-payment-intent', async (req, res) => {
+    try {
+        const { amount } = req.body;
+        const amountInCents = Math.round(Number(amount) * 100);
+
+        const paymentIntent = await stripe.paymentIntents.create({
+            amount: amountInCents,
+            currency: 'mxn',
+            automatic_payment_methods: { enabled: true },
+        });
+
+        res.json({ clientSecret: paymentIntent.client_secret });
+    } catch (e) {
+        handleError(res, e);
+    }
+});
+
 // --- API Endpoints ---
 
 // 1. Get Products with Filtering & Search

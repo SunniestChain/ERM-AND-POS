@@ -3,6 +3,8 @@ import { api } from '../api';
 import HierarchySelector from './HierarchySelector';
 import SalesHistory from './SalesHistory';
 
+import SalesHistory from './SalesHistory';
+import PaymentModal from './PaymentModal';
 import ReceiptModal from './ReceiptModal';
 
 const POSProductCard = ({ product, onAddToCart, refreshTrigger }) => {
@@ -132,6 +134,7 @@ export default function POS() {
     const [message, setMessage] = useState('');
     const [loading, setLoading] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [currentSaleId, setCurrentSaleId] = useState(null);
     const [refreshTrigger, setRefreshTrigger] = useState(0); // Forces re-fetch of stock
 
@@ -249,9 +252,14 @@ export default function POS() {
 
     const cartTotal = cart.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
 
-    const handleCheckout = async () => {
+    const handleCheckoutButton = () => {
         if (cart.length === 0) return;
+        setShowPaymentModal(true);
+    };
+
+    const handlePaymentConfirm = async (paymentData) => {
         setLoading(true);
+        setShowPaymentModal(false);
         try {
             const saleData = {
                 items: cart.map(item => ({
@@ -260,7 +268,8 @@ export default function POS() {
                     unitPrice: item.unitPrice,
                     productName: item.product.name,
                     supplierName: item.variant.supplierName
-                }))
+                })),
+                ...paymentData
             };
 
             const result = await api.createSale(saleData);
@@ -473,7 +482,7 @@ export default function POS() {
                     </div>
 
                     <button
-                        onClick={handleCheckout}
+                        onClick={handleCheckoutButton}
                         disabled={loading || cart.length === 0}
                         style={{
                             width: '100%',
@@ -494,6 +503,13 @@ export default function POS() {
             </div>
 
             {showHistory && <SalesHistory onClose={() => setShowHistory(false)} />}
+            {showPaymentModal && (
+                <PaymentModal
+                    total={cartTotal}
+                    onConfirm={handlePaymentConfirm}
+                    onClose={() => setShowPaymentModal(false)}
+                />
+            )}
             {currentSaleId && <ReceiptModal saleId={currentSaleId} onClose={() => setCurrentSaleId(null)} />}
         </div>
     );

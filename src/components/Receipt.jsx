@@ -69,9 +69,27 @@ export default function Receipt({ sale, onClose }) {
                     </tbody>
                 </table>
 
-                <div style={{ marginTop: '1rem', borderTop: '2px solid #000', paddingTop: '0.5rem', display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.2rem' }}>
-                    <span>TOTAL</span>
-                    <span>${sale.total_amount.toFixed(2)}</span>
+                <div style={{ marginTop: '1rem', borderTop: '2px solid #000', paddingTop: '0.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.2rem', marginBottom: '0.5rem' }}>
+                        <span>TOTAL</span>
+                        <span>${sale.total_amount.toFixed(2)}</span>
+                    </div>
+                    {sale.payment_method && (
+                        <div style={{ fontSize: '0.9rem', color: '#333' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span>Payment Method:</span>
+                                <span>{sale.payment_method}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span>Amount Paid:</span>
+                                <span>${Number(sale.amount_paid || sale.total_amount).toFixed(2)}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span>Change:</span>
+                                <span>${Number(sale.change || 0).toFixed(2)}</span>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div style={{ marginTop: '2rem', textAlign: 'center', fontStyle: 'italic', fontSize: '0.8rem' }}>
