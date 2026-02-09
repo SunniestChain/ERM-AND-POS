@@ -213,7 +213,28 @@ const CustomerShop = ({ user, onLogout }) => {
         };
     }, [products, visibleCount]);
 
-    const handleCheckout = () => {
+    const [clientSecret, setClientSecret] = useState('');
+
+    const handleCheckout = async () => {
+        // Pre-fetch Stripe Intent for Card payments to avoid double-creation in Strict Mode
+        if (cartTotal > 0) {
+            try {
+                const API_URL = '/api'; // Should match configured API URL
+                const res = await fetch(`${API_URL}/create-payment-intent`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ amount: cartTotal })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    setClientSecret(data.clientSecret);
+                } else {
+                    console.error("Failed to create payment intent");
+                }
+            } catch (e) {
+                console.error("Error creating payment intent:", e);
+            }
+        }
         setShowCart(false);
         setShowPaymentModal(true);
     };
@@ -378,6 +399,7 @@ const CustomerShop = ({ user, onLogout }) => {
                     onConfirm={handlePaymentConfirm}
                     onClose={() => setShowPaymentModal(false)}
                     allowedMethods={['Card', 'Transfer']}
+                    clientSecretProp={clientSecret}
                 />
             )}
 

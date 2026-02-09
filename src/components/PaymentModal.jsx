@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
@@ -58,36 +58,20 @@ const CheckoutForm = ({ amount, onSuccess, onCancel }) => {
     );
 };
 
-const PaymentModal = ({ total, onConfirm, onClose, allowedMethods = ['Cash', 'Card', 'Transfer'] }) => {
+const PaymentModal = ({ total, onConfirm, onClose, allowedMethods = ['Cash', 'Card', 'Transfer'], clientSecretProp }) => {
     const [amountPaid, setAmountPaid] = useState('');
     // Default to first allowed method
     const [paymentMethod, setPaymentMethod] = useState(allowedMethods[0]);
     const [change, setChange] = useState(0);
-    const [clientSecret, setClientSecret] = useState('');
-
-    const API_URL = '/api';
+    const [clientSecret, setClientSecret] = useState(clientSecretProp || '');
 
     useEffect(() => {
-        if (paymentMethod === 'Card') {
-            fetch(`${API_URL}/create-payment-intent`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ amount: total })
-            })
-                .then(res => {
-                    if (!res.ok) throw new Error("API call failed");
-                    return res.json();
-                })
-                .then(data => {
-                    setClientSecret(data.clientSecret);
-                })
-                .catch(err => {
-                    console.error("Error fetching payment intent:", err);
-                });
-        } else {
-            setClientSecret('');
+        if (clientSecretProp) {
+            setClientSecret(clientSecretProp);
         }
-    }, [paymentMethod, total]);
+    }, [clientSecretProp]);
+
+    // Internal fetch removed to prevent duplicates. Intent is passed from parent.
 
     useEffect(() => {
         if (paymentMethod !== 'Cash') {
