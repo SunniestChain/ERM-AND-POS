@@ -3,7 +3,13 @@ import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
 // Initialize Stripe
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+// Initialize Stripe
+const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+const stripePromise = stripeKey ? loadStripe(stripeKey) : null;
+
+if (!stripeKey) {
+    console.error("Stripe Publishable Key is missing. Card payments will be disabled.");
+}
 
 const CheckoutForm = ({ amount, onSuccess, onCancel }) => {
     const stripe = useStripe();
@@ -162,7 +168,7 @@ const PaymentModal = ({ total, onConfirm, onClose }) => {
                     </div>
                 </div>
 
-                {paymentMethod === 'Card' && clientSecret ? (
+                {paymentMethod === 'Card' && clientSecret && stripePromise ? (
                     <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: 'night' } }}>
                         <CheckoutForm
                             amount={total}
@@ -177,6 +183,10 @@ const PaymentModal = ({ total, onConfirm, onClose }) => {
                             onCancel={() => setPaymentMethod('Cash')}
                         />
                     </Elements>
+                ) : paymentMethod === 'Card' ? (
+                    <div style={{ padding: '2rem', textAlign: 'center', color: '#ff6b6b' }}>
+                        {stripePromise ? "Loading secure payment..." : "Stripe Configuration Missing (Check Console)"}
+                    </div>
                 ) : (
                     <>
                         <div style={{ marginBottom: '1.5rem' }}>
