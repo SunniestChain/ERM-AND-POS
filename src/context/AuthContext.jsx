@@ -44,8 +44,9 @@ export const AuthProvider = ({ children }) => {
             const data = await res.json();
 
             if (data.success && data.user) {
-                setUser(data.user); // Auto login
-                localStorage.setItem('app_user', JSON.stringify(data.user));
+                // No auto-login as per user request
+                // setUser(data.user); 
+                // localStorage.setItem('app_user', JSON.stringify(data.user));
                 return { success: true };
             }
             return { success: false, error: data.error || 'Registration failed' };

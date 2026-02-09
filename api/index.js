@@ -9,6 +9,10 @@ const PORT = 3000;
 
 app.use(cors());
 app.use(express.json());
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    next();
+});
 
 // --- Helper for Errors ---
 const handleError = (res, err) => {
@@ -185,25 +189,54 @@ app.get('/api/hierarchy', async (req, res) => {
 // 4. Sales APIs
 app.get('/api/sales', async (req, res) => {
     try {
-        // Build query
         let query = supabase
             .from('sales')
-            .select('*')
+            .select('*, items:sale_items(*)')
             .order('created_at', { ascending: false })
             .limit(50);
 
-        const { items, customerId } = req.body;
+        // Customer Context
+        const customerId = req.headers['x-customer-id'];
+        if (customerId) {
+            query = query.eq('customer_id', customerId);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        res.json(data);
+    } catch (err) {
+        handleError(res, err);
+    }
+});
+
+// Registering Sales
+console.log("Registering /api/sales route...");
+app.post('/api/sales', async (req, res) => {
+    console.log("POST /api/sales hit!", req.body);
+    try {
+        // Build query - Wait, this was a GET/POST hybrid mistake?
+        // IF this endpoint is for CREATING sales, it should be POST.
+        // IF it is for LISTING, it should be GET.
+        // The code below is clearly for CREATING.
+        // So I will make this app.post and remove the listing logic/query part if it was there?
+        // Actually, lines 189-193 created a 'query' variable but didn't use it for the insert logic. 
+        // It seems I merged two endpoints or replaced one. Use typical POST structure.
+
+        const { items, customerId, paymentMethod, amountPaid, change, transactionId } = req.body;
         if (!items || items.length === 0) return res.status(400).json({ error: "No items" });
 
         const totalAmount = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
 
-        // Transaction logic via Supabase is tricky without RPC, but we can do sequential inserts.
         // 1. Create Sale
         const { data: sale, error: sErr } = await supabase
             .from('sales')
             .insert({
                 total_amount: totalAmount,
-                customer_id: customerId || null // Link to customer if provided
+                customer_id: customerId || null,
+                payment_method: paymentMethod || 'Cash',
+                amount_paid: amountPaid || totalAmount,
+                change: change || 0,
+                transaction_id: transactionId || null
             })
             .select()
             .single();
@@ -735,6 +768,8 @@ const initSystem = async () => {
 // Call it
 initSystem();
 
+// Registering Route
+console.log("Registering /api/register route...");
 app.post('/api/register', async (req, res) => {
     try {
         const { username, password, email } = req.body;

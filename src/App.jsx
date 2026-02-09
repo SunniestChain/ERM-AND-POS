@@ -21,6 +21,9 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     // If POS user tries to access Admin pages, send them to POS
     if (user.role === 'employee') return <Navigate to="/pos" replace />;
+    // If Customer tries to access Admin pages, send them to Shop
+    if (user.role === 'customer') return <Navigate to="/shop" replace />;
+
     return <Navigate to="/" replace />;
   }
 

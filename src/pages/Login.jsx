@@ -13,11 +13,13 @@ export default function Login() {
     const [email, setEmail] = useState(''); // Only for registration
 
     const [error, setError] = useState('');
+    const [successMessage, setSuccessMessage] = useState(''); // Success state
     const [loading, setLoading] = useState(false);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
+        setSuccessMessage(''); // Clear previous success
         setLoading(true);
 
         let result;
@@ -30,25 +32,19 @@ export default function Login() {
         setLoading(false);
 
         if (result.success) {
-            // Check context user role or wait for AuthProvider to update?
-            // Actually result doesn't return user object directly here in my context impl, 
-            // but context updates state. We can redirect.
-            // But to be safe, we can pull role from localStorage or wait.
-            // MVP: detailed redirect in App.jsx based on role? 
-            // The ProtectedRoute handles access control. 
-            // We need to know WHERE to send them.
-            // Let's assume generic redirect to root, and App will redirect to /shop if customer?
-            // Existing App logic: 
-            // <Route path="/" element={<ProtectedRoute...><Dashboard/></ProtectedRoute>} />
-            // If customer goes to /, ProtectedRoute says:
-            // if (!allowedRoles.includes(role)) -> if customer -> ?
-            // I added logic in ProtectedRoute:
-            // if (user.role === 'employee') return <Navigate to="/pos" />;
-            // I need to add: if (user.role === 'customer') return <Navigate to="/shop" />;
-
-            // Wait, I should update App.jsx ProtectedRoute logic too!
-
-            navigate('/');
+            if (isLogin) {
+                // Determine redirect path
+                // Wait for context to update (user state)
+                // Actually navigate happens only after login. Registration doesn't login anymore.
+                navigate('/');
+            } else {
+                // Registration Success
+                setIsLogin(true);
+                setError('');
+                // Maybe a success state to show message
+                // I will add a successMessage state
+                setSuccessMessage("Account created successfully! Please log in.");
+            }
         } else {
             setError(result.error);
         }
@@ -79,6 +75,8 @@ export default function Login() {
                 </div>
 
                 {error && <div style={{ color: '#ff6b6b', fontSize: '0.9rem', textAlign: 'center', background: 'rgba(255,0,0,0.1)', padding: '0.5rem', borderRadius: '4px' }}>{error}</div>}
+
+                {successMessage && <div style={{ color: '#51cf66', fontSize: '0.9rem', textAlign: 'center', background: 'rgba(0,255,0,0.1)', padding: '0.5rem', borderRadius: '4px' }}>{successMessage}</div>}
 
                 <div>
                     <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>Username</label>

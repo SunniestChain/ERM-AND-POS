@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.PROD ? '/api' : 'http://localhost:3000/api';
+const API_URL = '/api';
 
 async function request(endpoint, options = {}) {
     const response = await fetch(`${API_URL}${endpoint}`, {

@@ -58,17 +58,18 @@ const CheckoutForm = ({ amount, onSuccess, onCancel }) => {
     );
 };
 
-const PaymentModal = ({ total, onConfirm, onClose }) => {
+const PaymentModal = ({ total, onConfirm, onClose, allowedMethods = ['Cash', 'Card', 'Transfer'] }) => {
     const [amountPaid, setAmountPaid] = useState('');
-    const [paymentMethod, setPaymentMethod] = useState('Cash');
+    // Default to first allowed method
+    const [paymentMethod, setPaymentMethod] = useState(allowedMethods[0]);
     const [change, setChange] = useState(0);
     const [clientSecret, setClientSecret] = useState('');
 
-    const API_URL = import.meta.env.PROD ? '' : 'http://localhost:3000';
+    const API_URL = '/api';
 
     useEffect(() => {
         if (paymentMethod === 'Card') {
-            fetch(`${API_URL}/api/create-payment-intent`, {
+            fetch(`${API_URL}/create-payment-intent`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ amount: total })
@@ -146,7 +147,7 @@ const PaymentModal = ({ total, onConfirm, onClose }) => {
                 <div style={{ marginBottom: '1.5rem' }}>
                     <label style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Payment Method</label>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        {['Cash', 'Card', 'Transfer'].map(method => (
+                        {allowedMethods.map(method => (
                             <button
                                 key={method}
                                 onClick={() => setPaymentMethod(method)}
@@ -180,12 +181,48 @@ const PaymentModal = ({ total, onConfirm, onClose }) => {
                                     transactionId: paymentIntent.id
                                 });
                             }}
-                            onCancel={() => setPaymentMethod('Cash')}
+                            onCancel={() => setPaymentMethod(allowedMethods[0])} // Reset to first allowed
                         />
                     </Elements>
                 ) : paymentMethod === 'Card' ? (
                     <div style={{ padding: '2rem', textAlign: 'center', color: '#ff6b6b' }}>
                         {stripePromise ? "Loading secure payment..." : "Stripe Configuration Missing (Check Console)"}
+                    </div>
+                ) : paymentMethod === 'Transfer' ? (
+                    <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '6px' }}>
+                        <p style={{ color: '#aaa', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Please transfer the exact amount to:</p>
+                        <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#fff', marginBottom: '0.5rem' }}>CLABE: 123456789012345678</div>
+                        <div style={{ fontSize: '1rem', color: '#fff', marginBottom: '1rem' }}>Bank: BANCO DE MEXICO</div>
+                        <p style={{ color: '#aaa', fontSize: '0.8rem' }}>Once transferred, click "Finish Sale" to record your order.</p>
+
+                        <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
+                            <button
+                                onClick={onClose}
+                                style={{
+                                    flex: 1,
+                                    padding: '1rem',
+                                    background: 'transparent',
+                                    border: '1px solid var(--border-subtle)',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    color: 'var(--text-muted)'
+                                }}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleConfirm}
+                                className="btn-primary"
+                                style={{
+                                    flex: 2,
+                                    padding: '1rem',
+                                    fontSize: '1.1rem',
+                                    fontWeight: 700
+                                }}
+                            >
+                                Finish Sale
+                            </button>
+                        </div>
                     </div>
                 ) : (
                     <>
