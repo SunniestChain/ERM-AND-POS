@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api';
 import HierarchySelector from './HierarchySelector';
 import SalesHistory from './SalesHistory';
-
-import SalesHistory from './SalesHistory';
 import PaymentModal from './PaymentModal';
 import ReceiptModal from './ReceiptModal';
 
