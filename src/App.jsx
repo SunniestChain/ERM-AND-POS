@@ -5,6 +5,8 @@ import Dashboard from './pages/Dashboard';
 import Management from './pages/Management';
 import POS from './components/POS';
 import Login from './pages/Login';
+import CustomerShop from './components/CustomerShop';
+import CustomerHistory from './components/CustomerHistory';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -25,12 +27,35 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   return children;
 };
 
+// Wrappers
+const CustomerShopWrapper = () => {
+  const { user, logout } = useAuth();
+  return <CustomerShop user={user} onLogout={logout} />;
+};
+
+const CustomerHistoryWrapper = () => {
+  const { user, logout } = useAuth();
+  return <CustomerHistory user={user} onLogout={logout} />;
+};
+
 export default function App() {
   return (
     <AuthProvider>
       <Router>
         <Routes>
           <Route path="/login" element={<Login />} />
+
+          <Route path="/shop" element={
+            <ProtectedRoute allowedRoles={['customer']}>
+              <CustomerShopWrapper />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/history" element={
+            <ProtectedRoute allowedRoles={['customer']}>
+              <CustomerHistoryWrapper />
+            </ProtectedRoute>
+          } />
 
           <Route path="/" element={
             <ProtectedRoute allowedRoles={['admin']}>

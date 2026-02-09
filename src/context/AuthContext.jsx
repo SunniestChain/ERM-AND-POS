@@ -24,7 +24,31 @@ export const AuthProvider = ({ children }) => {
                 localStorage.setItem('app_user', JSON.stringify(data.user));
                 return { success: true };
             }
-            return { success: false, error: 'Invalid response' };
+            return { success: false, error: data.error || 'Invalid response' };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    };
+
+    const register = async (username, password, email) => {
+        try {
+            // We need to add api.register to api.js first or call fetch directly. 
+            // Better to add to api.js, but for speed I'll fetch here or update api.js.
+            // I'll update api.js in a moment. For now, fetch directly to avoid breaking flow.
+            const API_URL = import.meta.env.PROD ? '/api' : 'http://localhost:3000/api';
+            const res = await fetch(`${API_URL}/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password, email })
+            });
+            const data = await res.json();
+
+            if (data.success && data.user) {
+                setUser(data.user); // Auto login
+                localStorage.setItem('app_user', JSON.stringify(data.user));
+                return { success: true };
+            }
+            return { success: false, error: data.error || 'Registration failed' };
         } catch (error) {
             return { success: false, error: error.message };
         }
@@ -36,7 +60,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, login, logout, loading }}>
+        <AuthContext.Provider value={{ user, login, register, logout, loading }}>
             {!loading && children}
         </AuthContext.Provider>
     );

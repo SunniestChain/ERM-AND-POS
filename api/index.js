@@ -185,23 +185,14 @@ app.get('/api/hierarchy', async (req, res) => {
 // 4. Sales APIs
 app.get('/api/sales', async (req, res) => {
     try {
-        const { data, error } = await supabase
+        // Build query
+        let query = supabase
             .from('sales')
             .select('*')
             .order('created_at', { ascending: false })
             .limit(50);
 
-        if (error) throw error;
-        res.json(data);
-    } catch (err) {
-        handleError(res, err);
-    }
-});
-
-// Create Sale
-app.post('/api/sales', async (req, res) => {
-    try {
-        const { items } = req.body;
+        const { items, customerId } = req.body;
         if (!items || items.length === 0) return res.status(400).json({ error: "No items" });
 
         const totalAmount = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
@@ -210,7 +201,10 @@ app.post('/api/sales', async (req, res) => {
         // 1. Create Sale
         const { data: sale, error: sErr } = await supabase
             .from('sales')
-            .insert({ total_amount: totalAmount })
+            .insert({
+                total_amount: totalAmount,
+                customer_id: customerId || null // Link to customer if provided
+            })
             .select()
             .single();
         if (sErr) throw sErr;
@@ -741,33 +735,62 @@ const initSystem = async () => {
 // Call it
 initSystem();
 
+app.post('/api/register', async (req, res) => {
+    try {
+        const { username, password, email } = req.body;
+        if (!username || !password || !email) return res.status(400).json({ error: "All fields required" });
+
+        // Check if user exists
+        const { data: existing } = await supabase.from('app_users').select('id').or(`username.eq.${username},email.eq.${email}`).maybeSingle();
+        if (existing) return res.status(400).json({ error: "Username or Email already exists" });
+
+        const { data, error } = await supabase.from('app_users').insert({
+            username,
+            password, // Plaintext as per existing pattern (should hash later)
+            email,
+            role: 'customer',
+            is_verified: true // Auto-verify for MVP
+        }).select().single();
+
+        if (error) throw error;
+        res.json({ success: true, user: { id: data.id, username: data.username, role: data.role, email: data.email } });
+    } catch (err) {
+        handleError(res, err);
+    }
+});
+
 app.post('/api/login', async (req, res) => {
     console.log("Login attempt for:", req.body.username);
     try {
         const { username, password } = req.body;
 
-        // Simple plaintext check for this specific request
         const { data: user, error } = await supabase
             .from('app_users')
-            .select('username, role, password')
+            .select('*') // Select all to get id, email, role
             .eq('username', username)
-            .single();
+            .maybeSingle(); // Use maybeSingle to avoid 406 on multiple matches (though username should be unique)
 
         if (error) {
             console.error("Login DB Error:", error.message);
             return res.status(401).json({ error: "User not found" });
         }
+        if (!user) {
+            return res.status(401).json({ error: "User not found" });
+        }
 
-        console.log("User found:", user);
-
-        // Explicit password check (since .eq('password', password) might be tricky with case or spaces if not careful)
-        // Although the previous query had .eq('password', password), let's do it in JS to be sure what's failing
         if (user.password !== password) {
-            console.error("Password mismatch. Expected:", user.password, "Againts:", password);
             return res.status(401).json({ error: "Invalid credentials" });
         }
 
-        res.json({ success: true, user: { username: user.username, role: user.role } });
+        res.json({
+            success: true,
+            user: {
+                id: user.id,
+                username: user.username,
+                role: user.role,
+                email: user.email
+            }
+        });
     } catch (err) {
         handleError(res, err);
     }
