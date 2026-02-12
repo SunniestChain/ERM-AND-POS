@@ -92,5 +92,25 @@ export const api = {
         method: 'POST',
         headers: { 'Content-Type': 'text/csv' },
         body: csvText
-    })
+    }),
+
+    // --- Cart Management ---
+    getCart: (userId) => request(`/cart?userId=${userId}`),
+
+    addToCart: (userId, variantId, quantity) => request('/cart/add', {
+        method: 'POST',
+        body: JSON.stringify({ userId, variantId, quantity })
+    }),
+
+    removeFromCart: (userId, variantId, quantity = null) => request('/cart/remove', {
+        method: 'POST',
+        body: JSON.stringify({ userId, variantId, quantity })
+    }),
+
+    clearCart: (userId) => request('/cart/clear', {
+        method: 'POST',
+        body: JSON.stringify({ userId })
+    }),
+
+    getAdminActiveCarts: () => request('/admin/active-carts')
 };

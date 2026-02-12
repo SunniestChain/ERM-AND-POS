@@ -116,7 +116,14 @@ const PaymentModal = ({ total, onConfirm, onClose, allowedMethods = ['Cash', 'Ca
             alignItems: 'center',
             justifyContent: 'center'
         }}>
-            <div className="glass-panel" style={{ width: '400px', padding: '2rem', background: 'var(--bg-panel)', border: '1px solid var(--border-subtle)' }}>
+            <div className="glass-panel" style={{
+                width: '400px',
+                maxHeight: '90vh',
+                overflowY: 'auto',
+                padding: '2rem',
+                background: 'var(--bg-panel)',
+                border: '1px solid var(--border-subtle)'
+            }}>
                 <h2 style={{ textAlign: 'center', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '1rem', color: '#fff' }}>
                     Complete Payment
                 </h2>

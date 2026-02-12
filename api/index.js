@@ -211,18 +211,14 @@ app.get('/api/sales', async (req, res) => {
 
 // Registering Sales
 console.log("Registering /api/sales route...");
+// Registering Sales
 app.post('/api/sales', async (req, res) => {
-    console.log("POST /api/sales hit!", req.body);
     try {
-        // Build query - Wait, this was a GET/POST hybrid mistake?
-        // IF this endpoint is for CREATING sales, it should be POST.
-        // IF it is for LISTING, it should be GET.
-        // The code below is clearly for CREATING.
-        // So I will make this app.post and remove the listing logic/query part if it was there?
-        // Actually, lines 189-193 created a 'query' variable but didn't use it for the insert logic. 
-        // It seems I merged two endpoints or replaced one. Use typical POST structure.
+        const { items, customerId, paymentMethod, amountPaid, change, transactionId, fromCart } = req.body;
 
-        const { items, customerId, paymentMethod, amountPaid, change, transactionId } = req.body;
+        // If fromCart is true, stock was ALREADY deducted on Add to Cart.
+        // If fromCart is false (POS), we must deduct stock now.
+
         if (!items || items.length === 0) return res.status(400).json({ error: "No items" });
 
         const totalAmount = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
@@ -236,39 +232,41 @@ app.post('/api/sales', async (req, res) => {
                 payment_method: paymentMethod || 'Cash',
                 amount_paid: amountPaid || totalAmount,
                 change: change || 0,
-                transaction_id: transactionId || null
+                transaction_id: transactionId || null,
+                created_at: new Date().toISOString()
             })
             .select()
             .single();
+
         if (sErr) throw sErr;
 
-        // 2. Create Sale Items & Update Stock
+        // 2. Create Sale Items
         for (const item of items) {
-            // Add Item
             const { error: iErr } = await supabase.from('sale_items').insert({
                 sale_id: sale.id,
                 variant_id: item.variantId,
-                product_name: item.productName,
-                supplier_name: item.supplierName,
+                product_name: item.product_name || item.productName, // Handle mapping
+                supplier_name: item.supplier_name || item.supplierName,
                 quantity: item.quantity,
                 unit_price: item.unitPrice,
                 subtotal: item.quantity * item.unitPrice
             });
             if (iErr) console.error("Error inserting item:", iErr);
 
-            // Update Stock (Decrement)
-            // Note: This is not atomic without RPC, but sufficient for this migration.
-            // Ideally: await supabase.rpc('decrement_stock', { variant_id, qty })
-            const { error: uErr } = await supabase.rpc('decrement_stock', {
-                row_id: item.variantId,
-                qty: item.quantity
-            });
-            // Warning: We haven't created this RPC yet. Let's do a direct update for now.
-            // To do it safely, we'd need to fetch current, then update.
-            const { data: currentVariant } = await supabase.from('product_variants').select('stock_quantity').eq('id', item.variantId).single();
-            if (currentVariant) {
-                await supabase.from('product_variants').update({ stock_quantity: currentVariant.stock_quantity - item.quantity }).eq('id', item.variantId);
+            // 3. Update Stock (Only if NOT from cart)
+            if (!fromCart) {
+                // POS Sale or non-cart flow: Decrement stock now.
+                // Ideally use RPC for atomicity checking, but manual update as fallback:
+                const { data: currentVariant } = await supabase.from('product_variants').select('stock_quantity').eq('id', item.variantId).single();
+                if (currentVariant) {
+                    await supabase.from('product_variants').update({ stock_quantity: currentVariant.stock_quantity - item.quantity }).eq('id', item.variantId);
+                }
             }
+        }
+
+        // 4. If fromCart, clean up cart items WITHOUT restoring stock
+        if (fromCart && customerId) {
+            await supabase.rpc('checkout_cart_clear', { p_user_id: customerId });
         }
 
         res.json({ success: true, saleId: sale.id });
@@ -828,6 +826,161 @@ app.post('/api/login', async (req, res) => {
         });
     } catch (err) {
         handleError(res, err);
+    }
+});
+
+// --- Cart Management (Server-Side + Stock Reservation) ---
+
+// GET /api/cart?userId=...
+app.get('/api/cart', async (req, res) => {
+    try {
+        const { userId } = req.query;
+        if (!userId) return res.status(400).json({ error: "userId required" });
+
+        // data structure: cart_items -> product_variants -> products
+        const { data, error } = await supabase
+            .from('cart_items')
+            .select(`
+                id,
+                quantity,
+                variant_id,
+                product_variants (
+                    id,
+                    price,
+                    sku,
+                    stock_quantity,
+                    products (
+                        id,
+                        name,
+                        image_url,
+                        description
+                    ),
+                    suppliers (name)
+                )
+            `)
+            .eq('user_id', userId);
+
+        if (error) throw error;
+
+        // Flatten for frontend convenience
+        const cart = data.map(item => ({
+            id: item.product_variants.products.id,
+            variantId: item.variant_id,
+            productName: item.product_variants.products.name,
+            variantName: item.product_variants.sku || item.product_variants.products.name, // Fallback
+            supplierName: item.product_variants.suppliers?.name || 'Unknown',
+            price: item.product_variants.price,
+            quantity: item.quantity,
+            image_url: item.product_variants.products.image_url,
+            stock_quantity: item.product_variants.stock_quantity // Real-time remaining stock (after reservation)
+        }));
+
+        res.json(cart);
+    } catch (e) {
+        handleError(res, e);
+    }
+});
+
+app.post('/api/cart/add', async (req, res) => {
+    try {
+        const { userId, variantId, quantity } = req.body;
+        // Call RPC to add securely and decrement stock
+        const { data, error } = await supabase
+            .rpc('add_to_cart', {
+                p_user_id: userId,
+                p_variant_id: variantId,
+                p_quantity: quantity || 1
+            });
+
+        if (error) throw error;
+        // Note: RPC returns custom JSON if we defined it, or void if not. 
+        // Our SQL logic raises EXCEPTION on failure, which comes as 'error' here.
+
+        res.json({ success: true });
+    } catch (e) {
+        // If "Insufficient stock" exception
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/cart/remove', async (req, res) => {
+    try {
+        const { userId, variantId, quantity } = req.body;
+        // quantity null means remove all
+        const { error } = await supabase
+            .rpc('remove_from_cart', {
+                p_user_id: userId,
+                p_variant_id: variantId,
+                p_quantity: quantity // can be null
+            });
+
+        if (error) throw error;
+        res.json({ success: true });
+    } catch (e) {
+        handleError(res, e);
+    }
+});
+
+app.post('/api/cart/clear', async (req, res) => {
+    try {
+        const { userId } = req.body;
+        const { error } = await supabase
+            .rpc('clear_cart_release_stock', {
+                p_user_id: userId
+            });
+
+        if (error) throw error;
+        res.json({ success: true });
+    } catch (e) {
+        handleError(res, e);
+    }
+});
+
+// Admin View: Active Carts
+app.get('/api/admin/active-carts', async (req, res) => {
+    try {
+        // We want to see: User ID/Name, Items in their cart
+        const { data, error } = await supabase
+            .from('cart_items')
+            .select(`
+                user_id,
+                quantity,
+                updated_at,
+                app_users (username, email),
+                product_variants (
+                    sku,
+                    products (name)
+                )
+            `);
+
+        if (error) throw error;
+
+        // Group by User
+        const cartsByUser = {};
+        data.forEach(item => {
+            const uid = item.user_id;
+            if (!cartsByUser[uid]) {
+                cartsByUser[uid] = {
+                    user: item.app_users,
+                    items: [],
+                    totalItems: 0,
+                    lastActive: item.updated_at
+                };
+            }
+            cartsByUser[uid].items.push({
+                product: item.product_variants?.products?.name,
+                sku: item.product_variants?.sku,
+                qty: item.quantity
+            });
+            cartsByUser[uid].totalItems += item.quantity;
+            if (new Date(item.updated_at) > new Date(cartsByUser[uid].lastActive)) {
+                cartsByUser[uid].lastActive = item.updated_at;
+            }
+        });
+
+        res.json(Object.values(cartsByUser));
+    } catch (e) {
+        handleError(res, e);
     }
 });
 

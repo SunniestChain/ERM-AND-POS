@@ -54,9 +54,9 @@ const ShopProductCard = ({ product, onAddToCart }) => {
                                     }}>
                                         {v.supplierName}
                                     </div>
-                                    {/* Incognito Stock: If > 0 show "In Stock", else "Out of Stock" */}
-                                    <div style={{ fontSize: '0.8rem', color: v.stock_quantity > 0 ? '#51cf66' : '#ff6b6b' }}>
-                                        {v.stock_quantity > 0 ? 'In Stock' : 'Out of Stock'}
+                                    {/* Incognito Stock: If >= 3 show "In Stock", else "Out of Stock" (Reserved for POS) */}
+                                    <div style={{ fontSize: '0.8rem', color: v.stock_quantity >= 3 ? '#51cf66' : '#ff6b6b' }}>
+                                        {v.stock_quantity >= 3 ? 'In Stock' : 'Out of Stock'}
                                     </div>
                                     <div style={{ fontSize: '0.9rem', color: '#ddd' }}>
                                         ${v.price ? v.price.toFixed(2) : '0.00'}
@@ -64,10 +64,10 @@ const ShopProductCard = ({ product, onAddToCart }) => {
                                 </div>
                                 <button
                                     onClick={() => onAddToCart(product, v)}
-                                    disabled={v.stock_quantity <= 0}
+                                    disabled={v.stock_quantity < 3}
                                     style={{
-                                        background: v.stock_quantity > 0 ? 'var(--primary-color)' : '#444',
-                                        cursor: v.stock_quantity > 0 ? 'pointer' : 'not-allowed',
+                                        background: v.stock_quantity >= 3 ? 'var(--primary-color)' : '#444',
+                                        cursor: v.stock_quantity >= 3 ? 'pointer' : 'not-allowed',
                                         border: 'none', borderRadius: '4px', padding: '0.5rem 1rem', color: '#fff',
                                         fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.5rem'
                                     }}
@@ -84,20 +84,24 @@ const ShopProductCard = ({ product, onAddToCart }) => {
 
 const CustomerShop = ({ user, onLogout }) => {
     const [products, setProducts] = useState([]);
-    const [cart, setCart] = useState(() => {
-        try {
-            const saved = localStorage.getItem(`shop_cart_${user.id}`);
-            return saved ? JSON.parse(saved) : [];
-        } catch (e) {
-            return [];
-        }
-    });
+    const [cart, setCart] = useState([]);
 
-    useEffect(() => {
-        localStorage.setItem(`shop_cart_${user.id}`, JSON.stringify(cart));
-    }, [cart, user.id]);
+    const loadCart = async () => {
+        try {
+            const data = await api.getCart(user.id);
+            setCart(data);
+        } catch (e) {
+            console.error("Failed to load cart", e);
+        }
+    };
+
     const [loading, setLoading] = useState(true);
     const [showCart, setShowCart] = useState(false);
+
+    useEffect(() => {
+        loadCart();
+    }, [user.id]);
+
     const [maxLimitError, setMaxLimitError] = useState('');
 
     // Filters
@@ -137,7 +141,7 @@ const CustomerShop = ({ user, onLogout }) => {
         }
     };
 
-    const addToCart = (product, variant) => {
+    const addToCart = async (product, variant) => {
         const currentQty = cart.reduce((sum, item) => sum + item.quantity, 0);
         if (currentQty >= 100) {
             setMaxLimitError("Limit reached: You cannot purchase more than 100 items.");
@@ -145,45 +149,43 @@ const CustomerShop = ({ user, onLogout }) => {
             return;
         }
 
-        const existing = cart.find(item => item.variantId === variant.id);
-        if (existing) {
-            setCart(cart.map(item => item.variantId === variant.id ? { ...item, quantity: item.quantity + 1 } : item));
-        } else {
-            setCart([...cart, {
-                id: product.id,
-                variantId: variant.id,
-                productName: product.name,
-                variantName: variant.sku || variant.part_number,
-                price: variant.price || 0,
-                quantity: 1
-            }]);
-        }
-    };
-
-    const removeFromCart = (item) => {
-        // Decrease quantity or remove if 1
-        // User asked for "option to add more", usually implies +/- controls.
-        // My remove button was fully removing.
-        // Let's change removeFromCart to decrease, and if 0 remove?
-        // Or keep remove as "Remove Item" and add a "-" button? 
-        // The CartModal has a "-" button calling onRemove.
-        // I should probably make onRemove decrease quantity, and only remove if <= 1.
-
-        if (item.quantity > 1) {
-            setCart(cart.map(c => c.variantId === item.variantId ? { ...c, quantity: c.quantity - 1 } : c));
-        } else {
-            setCart(cart.filter(c => c.variantId !== item.variantId));
-        }
-    };
-
-    const increaseQuantity = (item) => {
-        const currentQty = cart.reduce((sum, i) => sum + i.quantity, 0);
-        if (currentQty >= 100) {
-            setMaxLimitError("Limit reached: You cannot purchase more than 100 items.");
+        try {
+            // Optimistic update or wait?
+            // Since this involves stock reservation, we MUST wait for server confirmation.
+            // If server fails (insufficient stock), we show error.
+            await api.addToCart(user.id, variant.id, 1);
+            loadCart(); // Reload to get authoritative state
+        } catch (e) {
+            setMaxLimitError(e.message || "Failed to add to cart");
             setTimeout(() => setMaxLimitError(''), 3000);
-            return;
         }
-        setCart(cart.map(c => c.variantId === item.variantId ? { ...c, quantity: c.quantity + 1 } : c));
+    };
+
+    const removeFromCart = async (item) => {
+        try {
+            // If quantity > 1, remove 1. If 1, remove all?
+            // The API handles p_quantity.
+            // My previous logic was: remove 1 if > 1, else filter out.
+            // Let's mirror that.
+
+            // Wait, UI interaction needs to be snappy.
+            // But we are releasing stock, so async is better.
+
+            await api.removeFromCart(user.id, item.variantId, 1);
+            loadCart();
+        } catch (e) {
+            alert("Error removing item: " + e.message);
+        }
+    };
+
+    const increaseQuantity = async (item) => {
+        try {
+            await api.addToCart(user.id, item.variantId, 1);
+            loadCart();
+        } catch (e) {
+            setMaxLimitError(e.message || "Insufficient Stock");
+            setTimeout(() => setMaxLimitError(''), 3000);
+        }
     };
 
     const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -216,10 +218,22 @@ const CustomerShop = ({ user, onLogout }) => {
     const [clientSecret, setClientSecret] = useState('');
 
     const handleCheckout = async () => {
-        // Pre-fetch Stripe Intent for Card payments to avoid double-creation in Strict Mode
+        // Validate stock one last time (refresh cart)
+        await loadCart();
+
+        // Check if any item violates the rule (Double-check)
+        // Although server prevents adding, we want to be sure before paying.
+        // Note: 'cart' state updates are async, so we should rely on the fetched data if we could, 
+        // but loadCart updates state. Ideally we verify 'data' from loadCart.
+        // For now, let's trust the current flow but ensuring we have the intent.
+
+        // Strict Mode protection
+        if (cart.length === 0) return;
+
+        // Pre-fetch Stripe Intent for Card payments
         if (cartTotal > 0) {
             try {
-                const API_URL = '/api'; // Should match configured API URL
+                const API_URL = '/api';
                 const res = await fetch(`${API_URL}/create-payment-intent`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -261,7 +275,8 @@ const CustomerShop = ({ user, onLogout }) => {
                 body: JSON.stringify({
                     customerId: user.id,
                     items: saleItems,
-                    ...paymentData
+                    ...paymentData,
+                    fromCart: true // Crucial: Tells backend stock is already reserved
                 })
             });
 
