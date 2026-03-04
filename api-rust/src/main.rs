@@ -5,10 +5,18 @@ mod routes;
 mod supabase;
 
 use actix_cors::Cors;
+use actix_files::Files;
 use actix_web::{middleware, web, App, HttpServer};
 
 use routes::admin::ResponseCache;
 use supabase::SupabaseClient;
+
+/// SPA fallback: serve index.html for any non-API route
+async fn spa_fallback() -> actix_files::NamedFile {
+    actix_files::NamedFile::open_async("./static/index.html")
+        .await
+        .expect("index.html not found in ./static")
+}
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -43,10 +51,18 @@ async fn main() -> std::io::Result<()> {
         .parse()
         .unwrap_or(3000);
 
+    // Check if static files exist (production build)
+    let has_static = std::path::Path::new("./static/index.html").exists();
+
     log::info!("Server running on http://localhost:{}", port);
     log::info!("Connected to Supabase");
     log::info!("Response cache enabled (30s TTL)");
     log::info!("Gzip/Brotli compression enabled");
+    if has_static {
+        log::info!("Serving frontend from ./static");
+    } else {
+        log::info!("No static files found — API-only mode (use Vite proxy for local dev)");
+    }
 
     HttpServer::new(move || {
         let cors = Cors::default()
@@ -55,7 +71,7 @@ async fn main() -> std::io::Result<()> {
             .allow_any_header()
             .max_age(3600);
 
-        App::new()
+        let mut app = App::new()
             .wrap(cors)
             .wrap(middleware::Compress::default())
             .wrap(middleware::Logger::new("[%t] %r %s %D ms"))
@@ -76,7 +92,7 @@ async fn main() -> std::io::Result<()> {
                         .into()
                     }),
             )
-            // Register all route modules
+            // Register all API routes
             .configure(routes::auth::config)
             .configure(routes::products::config)
             .configure(routes::variants::config)
@@ -85,8 +101,17 @@ async fn main() -> std::io::Result<()> {
             .configure(routes::admin::config)
             .configure(routes::stripe::config)
             .configure(routes::inventory::config)
-            // Settings routes last (they use dynamic {table} patterns)
-            .configure(routes::settings::config)
+            // Settings routes (dynamic {table})
+            .configure(routes::settings::config);
+
+        // Serve frontend static files in production
+        if has_static {
+            app = app
+                .service(Files::new("/assets", "./static/assets").use_last_modified(true))
+                .default_service(web::get().to(spa_fallback));
+        }
+
+        app
     })
     .bind(("0.0.0.0", port))?
     .run()
