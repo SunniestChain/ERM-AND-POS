@@ -12,12 +12,14 @@ use supabase::SupabaseClient;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    // Load .env from project root (one level up from api-rust/)
+    // Load .env from project root (one level up from api-rust/) for local dev
     let env_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
         .join(".env");
     dotenvy::from_path(&env_path).ok();
+    // Also try current directory (for Docker)
+    dotenvy::dotenv().ok();
 
     // Initialize logger
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
@@ -35,7 +37,11 @@ async fn main() -> std::io::Result<()> {
     // Response cache: 30s TTL for hierarchy/products (rarely change)
     let cache = web::Data::new(ResponseCache::new(30));
 
-    let port = 3000u16;
+    // Use PORT env var (set by Render/Railway) or default to 3000
+    let port: u16 = std::env::var("PORT")
+        .unwrap_or_else(|_| "3000".to_string())
+        .parse()
+        .unwrap_or(3000);
 
     log::info!("Server running on http://localhost:{}", port);
     log::info!("Connected to Supabase");
