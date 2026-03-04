@@ -7,9 +7,6 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Old Node.js backend (replaced by api-rust/)
-api/
-
 node_modules
 dist
 dist-ssr
@@ -26,13 +23,13 @@ dist-ssr
 *.sln
 *.sw?
 
-# Temp files
-*.csv
-server.zip
-
 # Environment Variables
 .env
 .env.*
 
-# Rust
+# Rust build artifacts
 api-rust/target
+
+# Temp / data files
+*.csv
+server.zip

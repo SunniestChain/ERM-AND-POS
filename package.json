@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "vite",
     "server": "source $HOME/.cargo/env && cd api-rust && cargo run",
-    "server:legacy": "node api/index.js",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
