@@ -8,6 +8,7 @@ import Receipt from './Receipt';
 const ShopProductCard = ({ product, onAddToCart }) => {
     const [variants, setVariants] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [addedId, setAddedId] = useState(null);
 
     useEffect(() => {
         let mounted = true;
@@ -19,6 +20,12 @@ const ShopProductCard = ({ product, onAddToCart }) => {
         });
         return () => mounted = false;
     }, [product.id]);
+
+    const handleAdd = (product, v) => {
+        onAddToCart(product, v);
+        setAddedId(v.id);
+        setTimeout(() => setAddedId(null), 800);
+    };
 
     return (
         <div className="glass-panel" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
@@ -63,17 +70,27 @@ const ShopProductCard = ({ product, onAddToCart }) => {
                                     </div>
                                 </div>
                                 <button
-                                    onClick={() => onAddToCart(product, v)}
+                                    onClick={() => handleAdd(product, v)}
                                     disabled={v.stock_quantity < 3}
                                     style={{
-                                        background: v.stock_quantity >= 3 ? 'var(--primary-color)' : '#444',
+                                        background: addedId === v.id ? '#22c55e' : (v.stock_quantity >= 3 ? 'var(--primary-color)' : '#444'),
                                         cursor: v.stock_quantity >= 3 ? 'pointer' : 'not-allowed',
                                         border: 'none', borderRadius: '4px', padding: '0.5rem 1rem', color: '#fff',
-                                        fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.5rem'
+                                        fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.5rem',
+                                        transition: 'all 0.2s ease',
+                                        transform: addedId === v.id ? 'scale(1.15)' : 'scale(1)',
+                                        boxShadow: addedId === v.id ? '0 0 12px rgba(34,197,94,0.5)' : 'none',
+                                        minWidth: '70px', justifyContent: 'center'
                                     }}
                                 >
-                                    <span>Add</span>
-                                    <span style={{ fontSize: '1.2rem' }}>+</span>
+                                    {addedId === v.id ? (
+                                        <span style={{ fontSize: '1.2rem' }}>✓</span>
+                                    ) : (
+                                        <>
+                                            <span>Add</span>
+                                            <span style={{ fontSize: '1.2rem' }}>+</span>
+                                        </>
+                                    )}
                                 </button>
                             </div>
                         ))}
