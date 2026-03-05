@@ -250,11 +250,35 @@ export default function POS() {
 
     const cartTotal = cart.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
 
-    const handleCheckoutButton = () => {
+    const [pendingClientSecret, setPendingClientSecret] = useState('');
+
+    const handleCheckoutButton = async () => {
         if (cart.length === 0) return;
-        // Generate a temporary ticket number (timestamp-based, will be replaced by saleId after creation)
+        // Generate a temporary ticket number
         const ticket = `POS-${Date.now().toString(36).toUpperCase()}`;
         setPendingTicket(ticket);
+
+        // Fetch Stripe PaymentIntent for Card payments
+        if (cartTotal > 0) {
+            try {
+                const token = localStorage.getItem('app_token');
+                const headers = { 'Content-Type': 'application/json' };
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+                const res = await fetch('/api/create-payment-intent', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ amount: cartTotal, ticketNumber: ticket })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    setPendingClientSecret(data.clientSecret);
+                } else {
+                    console.error("Failed to create payment intent:", await res.text());
+                }
+            } catch (e) {
+                console.error("Error creating payment intent:", e);
+            }
+        }
         setShowPaymentModal(true);
     };
 
@@ -510,6 +534,7 @@ export default function POS() {
                     onConfirm={handlePaymentConfirm}
                     onClose={() => setShowPaymentModal(false)}
                     ticketNumber={pendingTicket}
+                    clientSecretProp={pendingClientSecret}
                 />
             )}
             {currentSaleId && <ReceiptModal saleId={currentSaleId} onClose={() => setCurrentSaleId(null)} />}

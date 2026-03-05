@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../api';
 import CartModal from './CartModal';
 import PaymentModal from './PaymentModal';
@@ -97,6 +97,9 @@ const CustomerShop = ({ user, onLogout }) => {
 
     const [loading, setLoading] = useState(true);
     const [showCart, setShowCart] = useState(false);
+    const [cartToast, setCartToast] = useState(null);
+    const [cartBounce, setCartBounce] = useState(false);
+    const toastTimeout = useRef(null);
 
     useEffect(() => {
         loadCart();
@@ -150,11 +153,17 @@ const CustomerShop = ({ user, onLogout }) => {
         }
 
         try {
-            // Optimistic update or wait?
-            // Since this involves stock reservation, we MUST wait for server confirmation.
-            // If server fails (insufficient stock), we show error.
             await api.addToCart(user.id, variant.id, 1);
-            loadCart(); // Reload to get authoritative state
+            loadCart();
+
+            // Show toast notification
+            if (toastTimeout.current) clearTimeout(toastTimeout.current);
+            setCartToast({ name: product.name, sku: variant.sku || variant.part_number });
+            setCartBounce(true);
+            toastTimeout.current = setTimeout(() => {
+                setCartToast(null);
+                setCartBounce(false);
+            }, 2000);
         } catch (e) {
             setMaxLimitError(e.message || "Failed to add to cart");
             setTimeout(() => setMaxLimitError(''), 3000);
@@ -322,6 +331,53 @@ const CustomerShop = ({ user, onLogout }) => {
 
     return (
         <div style={{ padding: '2rem', height: '100vh', overflowY: 'auto', background: 'var(--bg-app)' }}>
+            {/* Cart Animation Styles */}
+            <style>{`
+                @keyframes cartBounce {
+                    0%, 100% { transform: scale(1); }
+                    30% { transform: scale(1.4); }
+                    60% { transform: scale(0.9); }
+                    80% { transform: scale(1.1); }
+                }
+                @keyframes toastSlideIn {
+                    0% { transform: translateX(120%); opacity: 0; }
+                    100% { transform: translateX(0); opacity: 1; }
+                }
+                @keyframes toastSlideOut {
+                    0% { transform: translateX(0); opacity: 1; }
+                    100% { transform: translateX(120%); opacity: 0; }
+                }
+                .cart-badge-bounce { animation: cartBounce 0.5s ease; }
+                .cart-toast {
+                    animation: toastSlideIn 0.3s ease forwards;
+                }
+            `}</style>
+
+            {/* Toast Notification */}
+            {cartToast && (
+                <div className="cart-toast" style={{
+                    position: 'fixed',
+                    top: '1.5rem',
+                    right: '1.5rem',
+                    background: 'linear-gradient(135deg, rgba(74,222,128,0.95), rgba(34,197,94,0.95))',
+                    color: '#fff',
+                    padding: '1rem 1.5rem',
+                    borderRadius: '12px',
+                    zIndex: 9999,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    boxShadow: '0 8px 32px rgba(74,222,128,0.3)',
+                    backdropFilter: 'blur(10px)',
+                    maxWidth: '350px'
+                }}>
+                    <span style={{ fontSize: '1.5rem' }}>✓</span>
+                    <div>
+                        <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>Added to cart!</div>
+                        <div style={{ fontSize: '0.8rem', opacity: 0.9 }}>{cartToast.name} — {cartToast.sku}</div>
+                    </div>
+                </div>
+            )}
             <header style={{ marginBottom: '2rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                     <div>
@@ -350,7 +406,7 @@ const CustomerShop = ({ user, onLogout }) => {
                         >
                             View Cart
                             {cart.length > 0 && (
-                                <span style={{
+                                <span className={cartBounce ? 'cart-badge-bounce' : ''} style={{
                                     position: 'absolute', top: '-10px', right: '-10px',
                                     background: '#ff6b6b', color: 'white', borderRadius: '50%',
                                     width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem'
