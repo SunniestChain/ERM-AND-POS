@@ -132,6 +132,8 @@ pub struct CartClear {
 #[derive(Deserialize)]
 pub struct PaymentRequest {
     pub amount: serde_json::Value,
+    #[serde(rename = "ticketNumber")]
+    pub ticket_number: Option<String>,
 }
 
 // --- Settings ---

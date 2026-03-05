@@ -4,9 +4,11 @@ use serde_json::json;
 use crate::error::AppError;
 use crate::models::SaleCreate;
 use crate::supabase::SupabaseClient;
+use crate::middleware::AuthUser;
 
 /// GET /api/sales
 pub async fn get_sales(
+    _auth: AuthUser,
     req: HttpRequest,
     sb: web::Data<SupabaseClient>,
 ) -> Result<HttpResponse, AppError> {
@@ -31,6 +33,7 @@ pub async fn get_sales(
 
 /// POST /api/sales
 pub async fn create_sale(
+    _auth: AuthUser,
     body: web::Json<SaleCreate>,
     sb: web::Data<SupabaseClient>,
 ) -> Result<HttpResponse, AppError> {

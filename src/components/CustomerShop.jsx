@@ -216,28 +216,30 @@ const CustomerShop = ({ user, onLogout }) => {
     }, [products, visibleCount]);
 
     const [clientSecret, setClientSecret] = useState('');
+    const [pendingTicket, setPendingTicket] = useState('');
 
     const handleCheckout = async () => {
         // Validate stock one last time (refresh cart)
         await loadCart();
 
-        // Check if any item violates the rule (Double-check)
-        // Although server prevents adding, we want to be sure before paying.
-        // Note: 'cart' state updates are async, so we should rely on the fetched data if we could, 
-        // but loadCart updates state. Ideally we verify 'data' from loadCart.
-        // For now, let's trust the current flow but ensuring we have the intent.
-
         // Strict Mode protection
         if (cart.length === 0) return;
+
+        // Generate a ticket number for this checkout
+        const ticket = `WEB-${Date.now().toString(36).toUpperCase()}`;
+        setPendingTicket(ticket);
 
         // Pre-fetch Stripe Intent for Card payments
         if (cartTotal > 0) {
             try {
                 const API_URL = '/api';
+                const token = localStorage.getItem('app_token');
+                const headers = { 'Content-Type': 'application/json' };
+                if (token) headers['Authorization'] = `Bearer ${token}`;
                 const res = await fetch(`${API_URL}/create-payment-intent`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ amount: cartTotal })
+                    headers,
+                    body: JSON.stringify({ amount: cartTotal, ticketNumber: ticket })
                 });
                 if (res.ok) {
                     const data = await res.json();
@@ -260,6 +262,9 @@ const CustomerShop = ({ user, onLogout }) => {
     const handlePaymentConfirm = async (paymentData) => {
         try {
             const API_URL = '/api';
+            const token = localStorage.getItem('app_token');
+            const saleHeaders = { 'Content-Type': 'application/json' };
+            if (token) saleHeaders['Authorization'] = `Bearer ${token}`;
 
             const saleItems = cart.map(item => ({
                 variantId: item.variantId,
@@ -271,7 +276,7 @@ const CustomerShop = ({ user, onLogout }) => {
 
             const res = await fetch(`${API_URL}/sales`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: saleHeaders,
                 body: JSON.stringify({
                     customerId: user.id,
                     items: saleItems,
@@ -415,6 +420,7 @@ const CustomerShop = ({ user, onLogout }) => {
                     onClose={() => setShowPaymentModal(false)}
                     allowedMethods={['Card', 'Transfer']}
                     clientSecretProp={clientSecret}
+                    ticketNumber={pendingTicket}
                 />
             )}
 

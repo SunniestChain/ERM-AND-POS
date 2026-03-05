@@ -58,7 +58,7 @@ const CheckoutForm = ({ amount, onSuccess, onCancel }) => {
     );
 };
 
-const PaymentModal = ({ total, onConfirm, onClose, allowedMethods = ['Cash', 'Card', 'Transfer'], clientSecretProp }) => {
+const PaymentModal = ({ total, onConfirm, onClose, allowedMethods = ['Cash', 'Card', 'Transfer'], clientSecretProp, ticketNumber }) => {
     const [amountPaid, setAmountPaid] = useState('');
     // Default to first allowed method
     const [paymentMethod, setPaymentMethod] = useState(allowedMethods[0]);
@@ -184,6 +184,57 @@ const PaymentModal = ({ total, onConfirm, onClose, allowedMethods = ['Cash', 'Ca
                         <p style={{ color: '#aaa', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Please transfer the exact amount to:</p>
                         <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#fff', marginBottom: '0.5rem' }}>CLABE: 123456789012345678</div>
                         <div style={{ fontSize: '1rem', color: '#fff', marginBottom: '1rem' }}>Bank: BANCO DE MEXICO</div>
+
+                        {ticketNumber && (
+                            <div style={{
+                                background: 'rgba(74, 222, 128, 0.1)',
+                                border: '1px solid rgba(74, 222, 128, 0.3)',
+                                borderRadius: '8px',
+                                padding: '1rem',
+                                marginBottom: '1rem'
+                            }}>
+                                <div style={{ color: '#4ade80', fontSize: '0.8rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '0.5rem' }}>
+                                    📋 Concepto de transferencia
+                                </div>
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.75rem',
+                                    justifyContent: 'space-between'
+                                }}>
+                                    <span style={{
+                                        fontSize: '1.3rem',
+                                        fontWeight: 800,
+                                        color: '#fff',
+                                        fontFamily: 'monospace',
+                                        letterSpacing: '1px'
+                                    }}>
+                                        Ticket #{ticketNumber}
+                                    </span>
+                                    <button
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(`Ticket #${ticketNumber}`);
+                                        }}
+                                        style={{
+                                            background: 'rgba(74, 222, 128, 0.2)',
+                                            border: '1px solid rgba(74, 222, 128, 0.4)',
+                                            borderRadius: '4px',
+                                            padding: '0.4rem 0.8rem',
+                                            color: '#4ade80',
+                                            cursor: 'pointer',
+                                            fontSize: '0.8rem',
+                                            fontWeight: 600
+                                        }}
+                                    >
+                                        Copiar
+                                    </button>
+                                </div>
+                                <p style={{ color: '#aaa', fontSize: '0.75rem', marginTop: '0.5rem', marginBottom: 0 }}>
+                                    Escribe este número como concepto en tu transferencia para identificar tu pago.
+                                </p>
+                            </div>
+                        )}
+
                         <p style={{ color: '#aaa', fontSize: '0.8rem' }}>Once transferred, click "Finish Sale" to record your order.</p>
 
                         <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>

@@ -1,12 +1,13 @@
 mod error;
 mod init;
+mod middleware;
 mod models;
 mod routes;
 mod supabase;
 
 use actix_cors::Cors;
 use actix_files::Files;
-use actix_web::{middleware, web, App, HttpServer};
+use actix_web::{middleware as actix_middleware, web, App, HttpServer};
 
 use routes::admin::ResponseCache;
 use supabase::SupabaseClient;
@@ -73,8 +74,8 @@ async fn main() -> std::io::Result<()> {
 
         let mut app = App::new()
             .wrap(cors)
-            .wrap(middleware::Compress::default())
-            .wrap(middleware::Logger::new("[%t] %r %s %D ms"))
+            .wrap(actix_middleware::Compress::default())
+            .wrap(actix_middleware::Logger::new("[%t] %r %s %D ms"))
             .app_data(sb_data.clone())
             .app_data(cache.clone())
             // Increase payload limit for CSV imports

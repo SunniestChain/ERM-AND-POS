@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 
 use crate::error::AppError;
 use crate::supabase::SupabaseClient;
+use crate::middleware::AuthUser;
 
 /// Simple TTL cache for JSON responses
 pub struct ResponseCache {
@@ -54,8 +55,12 @@ impl ResponseCache {
 
 /// GET /api/admin/stats
 pub async fn get_stats(
+    auth: AuthUser,
     sb: web::Data<SupabaseClient>,
 ) -> Result<HttpResponse, AppError> {
+    if auth.role != "admin" {
+        return Err(AppError::unauthorized("Admin access required"));
+    }
     let data = sb
         .query_single("admin_stats", "*", &[])
         .await?;
@@ -82,8 +87,12 @@ pub async fn get_stats(
 
 /// GET /api/admin/active-carts
 pub async fn get_active_carts(
+    auth: AuthUser,
     sb: web::Data<SupabaseClient>,
 ) -> Result<HttpResponse, AppError> {
+    if auth.role != "admin" {
+        return Err(AppError::unauthorized("Admin access required"));
+    }
     let select = "user_id,quantity,updated_at,app_users(username,email),product_variants(sku,products(name))";
     let data = sb.query("cart_items", select, &[]).await?;
 

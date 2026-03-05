@@ -135,6 +135,7 @@ export default function POS() {
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [currentSaleId, setCurrentSaleId] = useState(null);
     const [refreshTrigger, setRefreshTrigger] = useState(0); // Forces re-fetch of stock
+    const [pendingTicket, setPendingTicket] = useState('');
 
     // Fetch products when filters OR search change
     useEffect(() => {
@@ -251,6 +252,9 @@ export default function POS() {
 
     const handleCheckoutButton = () => {
         if (cart.length === 0) return;
+        // Generate a temporary ticket number (timestamp-based, will be replaced by saleId after creation)
+        const ticket = `POS-${Date.now().toString(36).toUpperCase()}`;
+        setPendingTicket(ticket);
         setShowPaymentModal(true);
     };
 
@@ -505,6 +509,7 @@ export default function POS() {
                     total={cartTotal}
                     onConfirm={handlePaymentConfirm}
                     onClose={() => setShowPaymentModal(false)}
+                    ticketNumber={pendingTicket}
                 />
             )}
             {currentSaleId && <ReceiptModal saleId={currentSaleId} onClose={() => setCurrentSaleId(null)} />}

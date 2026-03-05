@@ -19,6 +19,8 @@ pub async fn create_payment_intent(
     };
     let amount_in_cents = (amount * 100.0).round() as i64;
 
+    let ticket = body.ticket_number.as_deref().unwrap_or("N/A");
+
     // Use Stripe REST API directly via reqwest
     let client = reqwest::Client::new();
     let resp = client
@@ -28,6 +30,8 @@ pub async fn create_payment_intent(
             ("amount", amount_in_cents.to_string()),
             ("currency", "mxn".to_string()),
             ("automatic_payment_methods[enabled]", "true".to_string()),
+            ("description", format!("Ticket #{}", ticket)),
+            ("metadata[ticket_number]", ticket.to_string()),
         ])
         .send()
         .await
@@ -64,6 +68,8 @@ pub async fn create_checkout_session(
     };
     let amount_in_cents = (amount * 100.0).round() as i64;
 
+    let ticket = body.ticket_number.as_deref().unwrap_or("N/A");
+
     // Get origin from request headers
     let origin = req
         .headers()
@@ -71,16 +77,19 @@ pub async fn create_checkout_session(
         .and_then(|v| v.to_str().ok())
         .unwrap_or("http://localhost:5173");
 
+    let product_name = format!("Ticket #{} — Mayco Diesel", ticket);
+
     let client = reqwest::Client::new();
     let resp = client
         .post("https://api.stripe.com/v1/checkout/sessions")
         .basic_auth(&stripe_key, None::<&str>)
         .form(&[
             ("line_items[0][price_data][currency]", "mxn"),
-            ("line_items[0][price_data][product_data][name]", "POS Sale Total"),
+            ("line_items[0][price_data][product_data][name]", &product_name),
             ("line_items[0][price_data][unit_amount]", &amount_in_cents.to_string()),
             ("line_items[0][quantity]", "1"),
             ("mode", "payment"),
+            ("metadata[ticket_number]", ticket),
             ("success_url", &format!("{}/?success=true&session_id={{CHECKOUT_SESSION_ID}}", origin)),
             ("cancel_url", &format!("{}/?canceled=true", origin)),
         ])

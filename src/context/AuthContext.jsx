@@ -10,8 +10,13 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         // Load user from localStorage
         const storedUser = localStorage.getItem('app_user');
-        if (storedUser) {
+        const storedToken = localStorage.getItem('app_token');
+        if (storedUser && storedToken) {
             setUser(JSON.parse(storedUser));
+        } else {
+            // Clear partial data
+            localStorage.removeItem('app_user');
+            localStorage.removeItem('app_token');
         }
         setLoading(false);
     }, []);
@@ -22,6 +27,9 @@ export const AuthProvider = ({ children }) => {
             if (data.success && data.user) {
                 setUser(data.user);
                 localStorage.setItem('app_user', JSON.stringify(data.user));
+                if (data.token) {
+                    localStorage.setItem('app_token', data.token);
+                }
                 return { success: true };
             }
             return { success: false, error: data.error || 'Invalid response' };
@@ -32,10 +40,7 @@ export const AuthProvider = ({ children }) => {
 
     const register = async (username, password, email) => {
         try {
-            // We need to add api.register to api.js first or call fetch directly. 
-            // Better to add to api.js, but for speed I'll fetch here or update api.js.
-            // I'll update api.js in a moment. For now, fetch directly to avoid breaking flow.
-            const API_URL = import.meta.env.PROD ? '/api' : 'http://localhost:3000/api';
+            const API_URL = '/api';
             const res = await fetch(`${API_URL}/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -43,10 +48,11 @@ export const AuthProvider = ({ children }) => {
             });
             const data = await res.json();
 
-            if (data.success && data.user) {
-                // No auto-login as per user request
-                // setUser(data.user); 
-                // localStorage.setItem('app_user', JSON.stringify(data.user));
+            if (data.success) {
+                // Check if OTP verification is needed
+                if (data.needsVerification) {
+                    return { success: true, needsVerification: true, email: data.email };
+                }
                 return { success: true };
             }
             return { success: false, error: data.error || 'Registration failed' };
@@ -55,13 +61,32 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    const verifyOTP = async (email, code) => {
+        try {
+            const data = await api.verifyOTP(email, code);
+            return { success: data.success, message: data.message };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    };
+
+    const resendOTP = async (email) => {
+        try {
+            const data = await api.resendOTP(email);
+            return { success: data.success, message: data.message };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    };
+
     const logout = () => {
         setUser(null);
         localStorage.removeItem('app_user');
+        localStorage.removeItem('app_token');
     };
 
     return (
-        <AuthContext.Provider value={{ user, login, register, logout, loading }}>
+        <AuthContext.Provider value={{ user, login, register, verifyOTP, resendOTP, logout, loading }}>
             {!loading && children}
         </AuthContext.Provider>
     );
