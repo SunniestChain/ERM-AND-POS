@@ -42,6 +42,7 @@ impl ResponseCache {
         entries.remove(key);
     }
 
+    #[allow(dead_code)]
     pub fn invalidate_all(&self) {
         let mut entries = self.entries.lock().unwrap();
         entries.clear();

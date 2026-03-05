@@ -1,3 +1,4 @@
+#[allow(unused_imports)]
 use serde::{Deserialize, Serialize};
 
 // --- Auth ---
@@ -14,13 +15,7 @@ pub struct RegisterRequest {
     pub email: String,
 }
 
-#[derive(Serialize)]
-pub struct UserResponse {
-    pub id: serde_json::Value,
-    pub username: String,
-    pub role: String,
-    pub email: Option<String>,
-}
+
 
 // --- Products ---
 #[derive(Deserialize)]
@@ -143,8 +138,3 @@ pub struct SettingsCreate {
     pub manufacturer_id: Option<serde_json::Value>,
 }
 
-// --- Generic ---
-#[derive(Serialize)]
-pub struct SuccessResponse {
-    pub success: bool,
-}

@@ -1,4 +1,4 @@
-use actix_web::{web, HttpRequest, FromRequest};
+use actix_web::{HttpRequest, FromRequest};
 use serde::{Deserialize, Serialize};
 use jsonwebtoken::{encode, decode, Header, Validation, EncodingKey, DecodingKey};
 
@@ -53,6 +53,7 @@ pub fn validate_jwt(token: &str) -> Result<Claims, AppError> {
 /// Extractor for authenticated users — add to any route handler to require auth
 /// Usage: `async fn handler(auth: AuthUser) -> ...`
 pub struct AuthUser {
+    #[allow(dead_code)]
     pub user_id: String,
     pub role: String,
 }
@@ -88,6 +89,7 @@ impl FromRequest for AuthUser {
 }
 
 /// Optional auth extractor — doesn't fail if no token, just returns None
+#[allow(dead_code)]
 pub struct OptionalAuth(pub Option<AuthUser>);
 
 impl FromRequest for OptionalAuth {

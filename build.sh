@@ -13,6 +13,10 @@ cp -r dist/* api-rust/static/
 echo "Static files copied:"
 ls -la api-rust/static/
 
+echo "=== Step 2.5: Cleanup frontend build artifacts (not needed at runtime) ==="
+rm -rf node_modules dist
+echo "Cleaned up node_modules and dist — only api-rust/static remains"
+
 echo "=== Step 3: Installing Rust ==="
 if ! command -v cargo &> /dev/null; then
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y

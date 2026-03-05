@@ -107,7 +107,7 @@ pub async fn register(
     let otp_code: String = format!("{:06}", rand::thread_rng().gen_range(100000..999999));
     let otp_expires = chrono::Utc::now() + chrono::Duration::minutes(15);
 
-    let new_user = sb
+    let _new_user = sb
         .insert_single(
             "app_users",
             &json!({
